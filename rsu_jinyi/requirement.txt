@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+func_timeout
+SQLAlchemy
+pymysql
+pycryptodome
+apscheduler
+requests
+pyyaml
