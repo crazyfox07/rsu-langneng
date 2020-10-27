@@ -315,6 +315,8 @@ class RsuSocket(object):
                 logger.error('接收到的指令为空')
                 self.monitor_rsu_status_on = True  # 打开心跳检测
                 return self.command_recv_set
+            elif not msg_str.startswith('ffff'):
+                logger.info('忽略指令： {}'.format(msg_str))
             else:
                 logger.error('未能解析的指令：%s' % (msg_str))
                 continue
@@ -326,7 +328,7 @@ class RsuSocket(object):
         :return:
         """
         issuer_info = self.command_recv_set.info_b4['IssuerInfo']
-        card_net = int(issuer_info[20: 24])  # 需要转换为整数
+        card_net = issuer_info[20: 24]  # 需要转换为整数
         card_sn = issuer_info[24: 40]
         issuer_identifier = self.command_recv_set.info_b2['IssuerIdentifier']
         card_sn_in_blacklist_flag = ThirdEtcApi.exists_in_blacklist(
@@ -411,8 +413,7 @@ class RsuSocket(object):
                       serial_number=self.command_recv_set.info_b2['SerialNumber'],  # 合同序列号"340119126C6AFEDE"
                       tac=self.command_recv_set.info_b5['TAC'],  # 交易认证码
                       terminal_id=self.command_recv_set.info_b5['PSAMNo'],  # 终端编号
-                      trans_before_balance=CommonUtil.hex_to_etcfee(trans_before_balance, unit='fen'),
-                      # 交易前余额 1999918332 单位分
+                      trans_before_balance=CommonUtil.hex_to_etcfee(trans_before_balance, unit='fen'), # 交易前余额 1999918332 单位分
                       trans_order_no=body.trans_order_no,  # 交易订单号 "6711683258167489287"
                       trans_type=self.command_recv_set.info_b5['TransType'],  # 交易类型（06:传统；09:复合）
                       vehicle_type=str(int(self.command_recv_set.info_b3['VehicleClass']))  # 收费车型

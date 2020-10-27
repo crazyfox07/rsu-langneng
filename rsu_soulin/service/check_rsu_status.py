@@ -5,6 +5,7 @@
 @file: check_rsu_status.py
 @time: 2020/9/15 15:32
 """
+import time
 import traceback
 import socket
 import datetime
@@ -37,9 +38,12 @@ class RsuStatus(object):
 
         for lane_num, rsu_client in CommonConf.RSU_SOCKET_STORE_DICT.items():
             if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:
-                logger.info('天线处于休眠状态')
+                logger.info('。。。天线处于休眠状态。。。')
                 continue
-            logger.info('++++++++++天线处于工作状态+++++++++++')
+            # if rsu_client.monitor_rsu_status_on == False:  # 处于扣费阶段，关闭心跳：
+            #     logger.info('处于扣费阶段，关闭心跳')
+            #     continue
+            # RsuStatus.rsu_heartbeat(rsu_client)  # 打开心跳检测
             now = datetime.datetime.now()
             # 假如三分钟没有心跳，则认为天线出故障，并重启socket
             logger.info('距离心跳时间更新：{}s'.format((now - rsu_client.rsu_heartbeat_time).seconds))
@@ -61,6 +65,21 @@ class RsuStatus(object):
         if upload_rsu_heartbeat_dict['rsu_broke_list']:
             upload_rsu_heartbeat_dict['status_code'] = '01'
         callback(upload_rsu_heartbeat_dict)
+
+    @staticmethod
+    @func_set_timeout(60*2)
+    def rsu_heartbeat(rsu_client: RsuSocket):
+        time.sleep(2)
+        rsu_client.rsu_heartbeat_time = datetime.datetime.now()  # 更新心跳最新事件
+        return
+        msg_bytes = rsu_client.socket_client.recv(1024)
+        msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
+        if msg_str.find('b2ffffffff') != -1 or msg_str[6:8] == 'b2':
+            rsu_client.rsu_heartbeat_time = datetime.datetime.now()  # 更新心跳最新事件
+            logger.info('更新心跳时间：{}， 指令：{}'.format(datetime.datetime.now(), msg_str))
+        else:
+            logger.error('设备异常，心跳指令：{}'.format(msg_str))
+        time.sleep(2)
 
     @staticmethod
     def init_rsu_status_list():
