@@ -5,8 +5,6 @@
 @file: rsu_store.py
 @time: 2020/9/17 17:20
 """
-from threading import Thread
-
 from common.config import CommonConf
 from common.log import logger
 from service.rsu_socket import RsuSocket
@@ -26,6 +24,8 @@ class RsuStore(object):
             if lane_num not in CommonConf.RSU_SOCKET_STORE_DICT:
                 rus_socket = RsuSocket(lane_num)
                 CommonConf.RSU_SOCKET_STORE_DICT[lane_num] = rus_socket
+                # 启动多线程监听天线状态
+                # CommonConf.EXECUTOR.submit(rus_socket.monitor_rsu_status, 'thread1')
         logger.info('=======================初始化天线集合=========================')
 
 

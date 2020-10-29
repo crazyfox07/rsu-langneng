@@ -5,14 +5,13 @@
 @file: db_orm.py
 @time: 2020/9/3 17:52
 """
-import traceback
 from datetime import datetime
-from sqlalchemy import Column, String, SmallInteger, DateTime, Integer, Float, Boolean
+from sqlalchemy import Column, String, SmallInteger, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
 
 from common.config import CommonConf
 from common.db_client import create_db_session
-from common.log import logger
+
 
 db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR, sqlite_database='etc_deduct.sqlite')
 Base = declarative_base()
@@ -29,52 +28,9 @@ class ETCFeeDeductInfoOrm(Base):
     create_time = Column('create_time', DateTime, default=datetime.now)  # now加括号的话数据都是这个固定时间
 
 
-class ETCRequestInfoOrm(Base):
-    __tablename__ = 'etc_request_info'
-    id = Column('id', String(32), primary_key=True)
-    lane_num = Column('lane_num', String(16))
-    trans_order_no = Column('trans_order_no', String(32), unique=True)
-    park_code = Column('park_code', String(16))
-    plate_no = Column('plate_no', String(32))
-    plate_color_code = Column('plate_color_code', String(16))
-    plate_type_code = Column('plate_type_code', String(16))
-    entrance_time = Column('entrance_time', Integer)
-    park_record_time = Column('park_record_time', Integer)
-    exit_time = Column('exit_time', Integer)
-    deduct_amount = Column('deduct_amount', Float)
-    receivable_total_amount = Column('receivable_total_amount', Float)
-    discount_amount = Column('discount_amount', Float)
-    flag = Column('flag', SmallInteger, default=0)
-    create_time = Column('create_time', DateTime, default=datetime.now)  # now加括号的话数据都是这个固定时间
-
-
-class RSUInfoOrm(Base):
-    __tablename__ = 'rsu_info'
-    id = Column('id', String(32), primary_key=True)
-    lane_num = Column('lane_num', String(16))
-    park_code = Column('park_code', String(16))
-    heartbeat_latest = Column('heartbeat_latest', DateTime)  # 天线的最新心跳时间
-
-
-
 def init_db():
     """初始化表"""
     Base.metadata.create_all(db_engine)
-
-def clear_table():
-    """
-    清空数据表
-    """
-    _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
-                                      sqlite_database='etc_deduct.sqlite')
-    try:
-        db_session.query(RSUInfoOrm).delete()
-        db_session.commit()
-    except:
-        db_session.rollback()
-        logger.error(traceback.format_exc())
-    finally:
-        db_session.close()
 
 
 def delete_table_all():
@@ -85,7 +41,6 @@ def delete_table_all():
 if __name__ == '__main__':
     # import json
     init_db()
-    clear_table()
     # data = {
     #     "lane_num": "1",  # chedaohao
     #     "trans_order_no": "7861300266476411030",

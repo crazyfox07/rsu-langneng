@@ -6,12 +6,10 @@
 @time: 2020/9/17 11:50
 """
 import json
-import threading
 import time
 import datetime
 import socket
 import traceback
-from pprint import pprint
 
 from func_timeout import func_set_timeout
 
@@ -69,7 +67,10 @@ class RsuSocket(object):
         self.rsu_on_or_off = StatusFlagConfig.RSU_ON
         if 'socket_client' in dir(self):
             del self.socket_client
-        t1 = time.time()
+        # 创建一个客户端的socket对象
+        self.socket_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # 连接服务端
+        self.socket_client.connect((self.rsu_conf['ip'], self.rsu_conf['port']))
         logger.info('=============================天线初始化=============================')
         # 设置连接超时
         # self.socket_client.settimeout(CommonConf.ETC_CONF_DICT['socket_connect_time_out'])
@@ -77,48 +78,35 @@ class RsuSocket(object):
         tx_power = hex(self.rsu_conf['tx_power'])[2:]
         if len(tx_power) == 1:
             tx_power = '0' + tx_power
-
-        # 创建一个客户端的socket对象
-        self.socket_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # # 连接服务端
-        self.socket_client.connect((self.rsu_conf['ip'], self.rsu_conf['port']))
-        # 授权初始化
-        ca = CommandSendSet.combine_ca()
-        logger.info('授权初始化ca: {}'.format(ca))
-        self.socket_client.send(bytes.fromhex(ca))
-        ba = self.socket_client.recv(1024).hex()
-        logger.info('接收授权初始化数据ba：{}'.format(ba))
-        self.command_recv_set.parse_ba(ba)
-        logger.info(self.command_recv_set.info_ba)
-        # 授权
-        # cb = CommandSendSet.combine_cb()
-        # logger.info('授权初始化cb: {}'.format(cb))
-        # self.socket_client.send(bytes.fromhex(cb))
-        # msg_str = self.socket_client.recv(1024).hex()
-        # logger.info('接收授权数据bb：{}'.format(msg_str))
         # 发送c0初始化指令，以二进制的形式发送数据，所以需要进行编码
-        c0 = CommandSendSet.combine_c0(tx_power=tx_power, pll_channel_id=self.rsu_conf['pll_channel_id'],
-                                       work_mode=self.rsu_conf['work_mode']).strip()
+        c0 = CommandSendSet.combine_c0(lane_mode=self.rsu_conf['lane_mode'], wait_time=self.rsu_conf['wait_time'],
+                                       tx_power=tx_power,
+                                       pll_channel_id=self.rsu_conf['pll_channel_id'],
+                                       trans_mode=self.rsu_conf['trans_mode']).strip()
         logger.info('发送c0初始化指令： %s' % (c0,))
         self.socket_client.send(bytes.fromhex(c0))
-        b0 = self.socket_client.recv(1024).hex()
-        logger.info('接收初始化数据：{}'.format(b0))
-        self.command_recv_set.parse_b0(b0)
-        if b0[10: 12] == '00':
-            self.rsu_status = StatusFlagConfig.RSU_NORMAL
+
+        # 接收数据
+        msg_bytes = self.socket_client.recv(1024)
+        msg_str = msg_bytes.hex()  # 字节转十六进制
+        logger.info('接收数据： {}'.format(repr(msg_str)))
+        print('初始化数据*************************************************************************')
+        # b0 天线设备状态信息帧
+        if msg_str[6: 8] == 'b0':
+            self.command_recv_set.parse_b0(msg_str)  # 解析b0指令
+            if self.command_recv_set.info_b0['RSUStatus'] == '00':
+                self.rsu_status = StatusFlagConfig.RSU_NORMAL
+                self.rsu_heartbeat_time = datetime.datetime.now()
+            else:
+                self.rsu_status = StatusFlagConfig.RSU_FAILURE
+        elif msg_str == '' and self.recreate_socket_count < 2:  # 可能由于上次没有正常关闭，导致mst_st为空
+            self.recreate_socket_count += 1
+            self.close_socket()
+            logger.info('==============再试一次初始化天线==============')
+            #  再试一次初始化天线
+            self.init_rsu()
         else:
-            self.rsu_status = StatusFlagConfig.RSU_FAILURE
-        t2 = time.time()
-        logger.info('初始化用时： {}s'.format(t2 - t1))
-        # 打开天线指令
-        c4 = CommandSendSet.combine_c4('01')
-        logger.info('发送c4打开天线指令： %s' % (c4,))
-        self.socket_client.send(bytes.fromhex(c4))
-        # self.socket_client.recv(1024)
-        t3 = time.time()
-        logger.info('打开天线用时： {}s'.format(t3 - t1))
-
-
+            self.recreate_socket_count = 0
 
     @func_set_timeout(CommonConf.ETC_HEARTBEAT_TIME_OUT)
     def etc_heart_recv(self):
@@ -165,11 +153,11 @@ class RsuSocket(object):
 
                 msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
                 logger.info('接收天线指令：{}'.format(msg_str))
-                if msg_str[8: 12] == 'b200':
+                if msg_str.find('b2ffffffff') != -1:
                     # 更新心跳时间
                     self.rsu_heartbeat_time = datetime.datetime.now()
                     logger.info(thread_name + ': 心跳： {}'.format(msg_str))
-                elif msg_str[8:10] == 'b4':
+                elif msg_str[6:8] == 'b2':
                     logger.info('{}: 检测到obu，还没有开始扣费： {}'.format(thread_name, msg_str))
                     time.sleep(0.3)
                     # 更新心跳时间
@@ -203,7 +191,6 @@ class RsuSocket(object):
         b5: 接收交易信息帧，表示此次交易成功结束
         :return:
         """
-        self.monitor_rsu_status_on = False  # 关闭心跳检测
         current_time = time.time()
         logger.info('==========================================开始扣费==========================================')
         logger.info('订单号：{}， 车牌号：{}， 车牌颜色：{}'.format(
@@ -213,97 +200,137 @@ class RsuSocket(object):
         # self.etc_charge_flag=True表示交易成功，self.etc_charge_flag=False表示交易失败
         self.etc_charge_flag = False
         obuid = None
-        result = dict(flag=False,
-                      data=None,
-                      error_msg="error")
-
+        error_result = dict(flag=False,
+                            data=None,
+                            error_msg="error")
+        # 设置超时时间
         while True:
             # 接收数据
-            msg_bytes = self.socket_client.recv(512)
-            msg_str = msg_bytes.hex()  # 字节转十六进制
-
-            if msg_str[8:10] == 'b2':
-                logger.info('接收b2心跳数据：{}'.format(msg_str))
-                if msg_str[10:12] == '00':
-                    self.rsu_heartbeat_time = datetime.datetime.now()
-                else:
-                    logger.error('天线心跳出现问题')
-                    return result
-
-            elif msg_str[8:10] == 'b4':
-                info_b4 = self.command_recv_set.parse_b4(b4=msg_str)
-                logger.info('接收b4: {}'.format(info_b4))
-                obuid = info_b4['ObuID']
-                # TODO 测试卡，正式环境要检测obu_status
-                obu_status = info_b4['OBUStatus']
-                # if obu_status == '01':
-                #     result['error_msg'] = 'obu非法拆卸！！！'
-                #     return result
-                black_list_status = info_b4['BlackListStatus']
-                if black_list_status == '01':
-                    result['error_msg'] = '属于黑名单车辆！！!'
-                    return result
-                # 当前日期
-                data_of_now = CommonUtil.timestamp_format(int(time.time()), '%Y%m%d')
-                if data_of_now > info_b4['DataOfExpire']:
-                    result['error_msg'] = '过期日期：{}'.format(info_b4['DataOfExpire'])
-                    return result
-
-                plate_no = info_b4['VehicleLicencePlateNumber']
-                try:
-                    plate_no = CommonUtil.parse_plate_code(plate_no).replace('测A', '鲁L')
-                except:
-                    logger.error(traceback.format_exc())
-                    result['error_msg'] = '车牌号解析错误：{}'.format(repr(plate_no))
-                    return result
-
-                plate_color = str(int(info_b4['VehicleLicencePlateColor'], 16))
-                if (plate_no != obu_body.plate_no) or (plate_color != obu_body.plate_color_code):
-                    error_msg = "车牌号或车颜色不匹配： 监控获取的车牌号：%s, 车颜色：%s; obu获取的车牌号：%s,车颜色：%s" % (
-                        obu_body.plate_no, obu_body.plate_color_code, plate_no, plate_color)
-                    logger.error(error_msg)
-                    result['error_msg'] = error_msg
-                    return result
-                consume_money = CommonUtil.etcfee_to_hex(obu_body.deduct_amount)  # 扣费金额
-                purchase_time = CommonUtil.timestamp_format(int(time.time()), format='%Y%m%d%H%M%S')
-                station_info = info_b4['StationInfo']
-                entry_time = CommonUtil.timestamp_format(int(time.time()) - 100, format='%Y%m%d%H%M%S')
-                c6 = CommandSendSet.combine_c6(obuid=obuid, consume_money=consume_money,
-                                               purchase_time=purchase_time,
-                                               station_info=station_info, entry_time=entry_time)
-                logger.info('b4后发送c6指令：{}'.format(c6))
-                self.socket_client.send(bytes.fromhex(c6))
-            elif msg_str[8:10] == 'b5':
-                self.command_recv_set.parse_b5(b5=msg_str)
-                logger.info('c6后接收b5指令：{}'.format(msg_str))
-                if self.command_recv_set.info_b5['ErrorCode'] == '01':
-                    logger.error('读取obu卡超时。。。。。。。。。。。。')
-                    # logger.info('b5后发送c6指令：{}'.format(c6))
-                    # self.socket_client.send(bytes.fromhex(c6))
-                    continue
-                c1 = CommandSendSet.combine_c1(obuid)
-                logger.info('b5后发送c1指令：{}'.format(c1))
-                self.socket_client.send(bytes.fromhex(c1))
-
-                self.etc_charge_flag = True
+            # msg_bytes = self.socket_client.recv(1024)
+            try:
+                msg_bytes = self.recv_msg()
+            except:
+                logger.error('搜索obu超时')
                 self.monitor_rsu_status_on = True  # 打开心跳检测
-                result['flag'] = True
-                result['data'] = self.command_recv_set
-                result['error_msg'] = None
-                return result
+                error_result['error_msg'] = '没有搜索到obu'
+                return error_result
+            logger.info('收到obu返回的数据,睡眠 {} s'.format(CommonConf.OBU_COMMAND_WAIT_TIME))
+            # 指令转义
+            msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
+            logger.info('接收数据： {}'.format(repr(msg_str)))
+            # 等待几毫秒
+            time.sleep(CommonConf.OBU_COMMAND_WAIT_TIME)
+            # b2 电子标签信息帧
+            if msg_str[6:8] == 'b2':
+                if msg_str[8:16] == 'ffffffff':  # 'ffffffff' 表示心跳
+                    logger.info('心跳')
+                elif msg_str[68:72] == '2001':
+                    info_b2 = self.command_recv_set.parse_b2(msg_str)  # 解析b2指令
+                    # 过期日期
+                    data_of_expire = self.command_recv_set.info_b2['DataOfExpire']
+                    # 当前日期
+                    data_of_now = CommonUtil.timestamp_format(int(time.time()), '%Y%m%d')
+                    if data_of_now > data_of_expire:
+                        error_result['error_msg'] = '过期日期：{}'.format(data_of_expire)
+                        return error_result
+                    # 电子标签mac地址
+                    obuid = info_b2['OBUID']
+                    # 获取c1指令
+                    c1 = CommandSendSet.combine_c1(obuid, obu_div_factor=self.rsu_conf['obu_div_factor'])
+                    logger.info('b2后发送c1指令：%s' % (c1))
+                    self.socket_client.send(bytes.fromhex(c1))
+                else:
+                    error_result['error_msg'] = 'obu卡有问题，obu状态码： {}'.format(msg_str[68:72])
+                    return error_result
+            # b3 车辆信息帧
+            elif msg_str[6:8] == 'b3':
+                if msg_str[16: 18] == '00':  # obu信息帧状态执行码，取值00正常
+                    self.command_recv_set.parse_b3(msg_str)  # 解析b3指令
+                    # TODO 车牌号，车颜色 需要校验， 不匹配需要返回
+                    plate_no = self.command_recv_set.info_b3['VehicleLicencePlateNumber']
+                    try:
+                        plate_no = CommonUtil.parse_plate_code(plate_no).replace('测A', '鲁L')
+                    except:
+                        logger.error(traceback.format_exc())
+                        logger.error('车牌号解析错误：{}'.format(repr(plate_no)))
+                    # 车牌颜色
+                    obu_plate_color = str(
+                        int(self.command_recv_set.info_b3['VehicleLicencePlateColor'], 16))  # obu车颜色
+                    if (obu_body.plate_no != plate_no) or (obu_body.plate_color_code != obu_plate_color):
+                        error_msg = "车牌号或车颜色不匹配： 监控获取的车牌号：%s, 车颜色：%s; obu获取的车牌号：%s,车颜色：%s" % (
+                            obu_body.plate_no, obu_body.plate_color_code, plate_no, obu_plate_color)
+                        logger.error(error_msg)
+                        error_result['error_msg'] = error_msg
+                        return error_result
+                    if obuid is None:  # 如果没有获取到obuid，继续
+                        logger.error('obuid is none =====================+++++++++++++++++++')
+                        continue
+                    # 再次获取c1指令并发送
+                    c1 = CommandSendSet.combine_c1(obuid, obu_div_factor=self.rsu_conf['obu_div_factor'])
+                    logger.info('b3后发送c1指令：%s' % (c1,))
+                    self.socket_client.send(bytes.fromhex(c1))
+                else:  # 状态执行码不正常，发送c2指令，终止交易
+                    c2 = CommandSendSet.combine_c2(obuid, stop_type='01')
+                    # logger.info('发送c2指令，终止交易:  %s' % (c2,))
+                    self.socket_client.send(bytes.fromhex(c2))
+                    error_result['error_msg'] = '终止交易'
+                    return error_result
+            # b4 速通卡信息帧
+            elif msg_str[6:8] == 'b4':
+                if msg_str[16: 18] == '00':  # 状态执行码，00说明后续速通卡信息合法有效
+                    logger.info('接收b4指令： {}'.format(msg_str))
+                    self.command_recv_set.parse_b4(msg_str)  # 解析b4指令
+                    logger.info('b4解析后：{}'.format(json.dumps(self.command_recv_set.info_b4, ensure_ascii=False)))
+                    # 获取并发送c6消费交易指令
+                    if CommonConf.ETC_CONF_DICT['debug'] == 'true':
+                        deduct_amount = CommonUtil.etcfee_to_hex(0.01)
+                    else:
+                        deduct_amount = CommonUtil.etcfee_to_hex(obu_body.deduct_amount)  # 扣款额，高字节在前
+                    purchase_time = CommonUtil.timestamp_format(int(time.time()))
+                    station = msg_str[132:212]  # 过站信息,40个字节
+                    c6 = CommandSendSet.combine_c6(obuid, card_div_factor=self.rsu_conf['obu_div_factor'],
+                                                   reserved='00000000',
+                                                   deduct_amount=deduct_amount, purchase_time=purchase_time,
+                                                   station=station)
+                    logger.info('b4后发送c6指令，消费交易，出口消费写过站: {}， 其中扣除费用{}'.format(c6, obu_body.deduct_amount))
+                    self.socket_client.send(bytes.fromhex(c6))
+                else:
+                    error_result['error_msg'] = 'b4指令有问题'
+                    return error_result
+            # b5 交易信息帧，表示此次交易成功结束
+            elif msg_str[6:8] == 'b5':
+                if msg_str[16: 18] == '00':  # 状态执行码，00说明正常
+                    self.command_recv_set.parse_b5(msg_str)  # 解析b5指令
+                    #  获取并发送c1继续交易指令
+                    c1 = CommandSendSet.combine_c1(obuid, obu_div_factor=self.rsu_conf['obu_div_factor'])
+                    logger.info('b5后发送c1指令：%s， 电子标签mac地址 obuid = %s' % (c1, obuid))
+                    self.socket_client.send(bytes.fromhex(c1))
+                    self.etc_charge_flag = True
+                    self.monitor_rsu_status_on = True  # 打开心跳检测
+                    return self.command_recv_set
+                else:
+                    error_result['error_msg'] = 'b5指令有问题'
+                    return error_result
+            elif not msg_str:
+                logger.error('接收到的指令为空')
+                self.monitor_rsu_status_on = True  # 打开心跳检测
+                return self.command_recv_set
+            elif not msg_str.startswith('ffff'):
+                logger.info('忽略指令： {}'.format(msg_str))
             else:
-                logger.info('未能解析到的指令：{}'.format(msg_str))
-
+                logger.error('未能解析的指令：%s' % (msg_str))
+                continue
+                # return self.command_recv_set
 
     def card_sn_in_blacklist(self):
         """
         黑名单查询
         :return:
         """
-        issuer_identifier = self.command_recv_set.info_b4['IssuerIdentifier']  # 发行商代码 8字节
-        card_net = self.command_recv_set.info_b4['CardNetNo']    # 卡片网络编号，2字节
-        # TODO 待确认
-        card_sn = self.command_recv_set.info_b4['UserCardNo']  # card id 8字节
+        issuer_info = self.command_recv_set.info_b4['IssuerInfo']
+        card_net = issuer_info[20: 24]  # 需要转换为整数
+        card_sn = issuer_info[24: 40]
+        issuer_identifier = self.command_recv_set.info_b2['IssuerIdentifier']
         card_sn_in_blacklist_flag = ThirdEtcApi.exists_in_blacklist(
             issuer_identifier=issuer_identifier, card_net=card_net, card_id=card_sn)
         error_msg = None
@@ -323,7 +350,7 @@ class RsuSocket(object):
                       data=None,
                       error_msg=None)
         # TODO 待待删打印信息
-        self.command_recv_set.print_obu_info()
+        # self.command_recv_set.print_obu_info()
         #  判断card_net和card_sn 物理卡号是否存在于黑名单中
         card_sn_in_blacklist_flag, error_msg = self.card_sn_in_blacklist()
         # 物理卡号存在于黑名单中直接返回
@@ -339,20 +366,20 @@ class RsuSocket(object):
         # 计算停车时长
         park_record_time = CommonUtil.time_difference(body.entrance_time, exit_time_stamp)
         # 交易后余额
-        balance = self.command_recv_set.info_b5['CardRestMoney']
+        balance = self.command_recv_set.info_b5['CardBalance']
         # 交易前余额 1999918332 单位分
         trans_before_balance = self.command_recv_set.info_b4['CardRestMoney']
         if CommonConf.ETC_CONF_DICT['debug'] == 'true':
             deduct_amount = 0.01
         else:
             deduct_amount = body.deduct_amount
-
-        card_net_no=self.command_recv_set.info_b4['CardNetNo'],  # 网络编号
-        # ETC 卡片类型 16 储值卡  17 记账卡，转换成十进制分别对应22,23
-        card_type = str(int(self.command_recv_set.info_b4['CardType'], 16))
-        # PSAM 卡编号 10字节
-        psam_id = self.command_recv_set.info_ba['PsamSN']
-        #  card_sn 物理卡号 8字节
+        # 卡片发行信息
+        issuer_info = self.command_recv_set.info_b4['IssuerInfo']
+        # ETC 卡片类型（22:储值卡；23:记账卡）, 位于issuer_info的16,17位， 16进制形式，需要转为10进制
+        card_type = str(int(issuer_info[16: 18], 16))
+        # PSAM 卡编号
+        psam_id = issuer_info[20: 40]
+        #  card_sn 物理卡号
         card_sn = psam_id[4:]
         # TODO 待确认
         logger.info('ETC 卡片类型（22:储值卡；23:记账卡）: {}'.format(card_type))
@@ -360,9 +387,9 @@ class RsuSocket(object):
                       # TODO 金额位数待确定
                       balance=CommonUtil.hex_to_etcfee(balance, unit='fen'),  # 交易后余额
                       # TODO 待确认
-                      card_net_no=card_net_no,  # 网络编号
+                      card_net_no=issuer_info[20:24],  # 网络编号
                       card_rnd=CommonUtil.random_str(8),  # 卡内随机数
-                      card_serial_no=self.command_recv_set.info_b5['ETCTradNo'],  # 卡内交易序号
+                      card_serial_no=self.command_recv_set.info_b5['ICCPaySerial'],  # 卡内交易序号
                       card_sn=card_sn,
                       # self.command_recv_set.info_b4['CardID'],  # "1030230218354952",ETC 支付时与卡物理号一致；非 ETC 时上传车牌号
                       card_type=card_type,  # "23",  # ETC 卡片类型（22:储值卡；23:记账卡）
@@ -373,8 +400,8 @@ class RsuSocket(object):
                       discount_amount=CommonUtil.yuan_to_fen(body.discount_amount),  # 折扣金额
                       entrance_time=entrance_time,  # 入场时间 yyyyMMddHHmmss
                       exit_time=exit_time,  # 交易时间（yyyyMMddHHmmss）
-                      issuer_identifier=self.command_recv_set.info_b4['IssuerIdentifier'].upper(),  # 发行商代码
-                      obu_id=self.command_recv_set.info_b4['ObuID'].upper(),  # OBU 序号编码
+                      issuer_identifier=self.command_recv_set.info_b2['IssuerIdentifier'].upper(),  # 发行商代码
+                      obu_id=self.command_recv_set.info_b2['OBUID'].upper(),  # OBU 序号编码
                       park_code=self.rsu_conf['park_code'],  # 车场编号
                       park_record_time=park_record_time,  # 停车时长,时间精确到秒， 6小时50分钟
                       plate_color_code=body.plate_color_code,  # 车牌颜色编码 0:蓝色、1:黄色、2:黑色、3:白色、4:渐变绿色、5:黄绿双拼、6:绿色、7:蓝白渐变
@@ -383,14 +410,13 @@ class RsuSocket(object):
                       psam_id=psam_id,  # PSAM 卡编号 "37010101000000295460"
                       psam_serial_no=self.command_recv_set.info_b5['PSAMTransSerial'],  # PSAM 流水号 "00005BA2",
                       receivable_total_amount=CommonUtil.yuan_to_fen(body.receivable_total_amount),  # 应收金额
-                      serial_number=self.command_recv_set.info_b4['ApplySerial'],  # 合同序列号"340119126C6AFEDE"
+                      serial_number=self.command_recv_set.info_b2['SerialNumber'],  # 合同序列号"340119126C6AFEDE"
                       tac=self.command_recv_set.info_b5['TAC'],  # 交易认证码
-                      terminal_id=self.command_recv_set.info_b5['PsamTerminalID'],  # 终端编号
-                      trans_before_balance=CommonUtil.hex_to_etcfee(trans_before_balance, unit='fen'),  # 交易前余额 1999918332 单位分
+                      terminal_id=self.command_recv_set.info_b5['PSAMNo'],  # 终端编号
+                      trans_before_balance=CommonUtil.hex_to_etcfee(trans_before_balance, unit='fen'), # 交易前余额 1999918332 单位分
                       trans_order_no=body.trans_order_no,  # 交易订单号 "6711683258167489287"
-                      # TODO 待确认
-                      trans_type='09',  # 交易类型（06:传统；09:复合）
-                      vehicle_type=str(int(self.command_recv_set.info_b4['VehicleClass']))  # 收费车型
+                      trans_type=self.command_recv_set.info_b5['TransType'],  # 交易类型（06:传统；09:复合）
+                      vehicle_type=str(int(self.command_recv_set.info_b3['VehicleClass']))  # 收费车型
                       )
         etc_deduct_info_dict = {"method": "etcPayUpload",
                                 "params": params}

@@ -34,7 +34,7 @@ class RsuStatus(object):
                                          black_file_version='0',
                                          black_file_version_incr='0'
                                          )
-        logger.info('。。。。。。。。。。。。。。。。。监听心跳。。。。。。。。。。。。。。。')
+        logger.info('监听心跳。。。。。。。')
 
         for lane_num, rsu_client in CommonConf.RSU_SOCKET_STORE_DICT.items():
             if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:
@@ -43,7 +43,6 @@ class RsuStatus(object):
             if rsu_client.monitor_rsu_status_on == False:  # 处于扣费阶段，关闭心跳：
                 logger.info('处于扣费阶段，关闭心跳')
                 continue
-
             RsuStatus.rsu_heartbeat(rsu_client)  # 打开心跳检测
             now = datetime.datetime.now()
             # 假如三分钟没有心跳，则认为天线出故障，并重启socket
@@ -65,7 +64,19 @@ class RsuStatus(object):
                 rsu_client.rsu_status = StatusFlagConfig.RSU_NORMAL
         if upload_rsu_heartbeat_dict['rsu_broke_list']:
             upload_rsu_heartbeat_dict['status_code'] = '01'
-        # callback(upload_rsu_heartbeat_dict)
+        callback(upload_rsu_heartbeat_dict)
+
+    @staticmethod
+    @func_set_timeout(60*2)
+    def rsu_heartbeat(rsu_client: RsuSocket):
+        msg_bytes = rsu_client.socket_client.recv(1024)
+        msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
+        if msg_str.find('b2ffffffff') != -1 or msg_str[6:8] == 'b2':
+            rsu_client.rsu_heartbeat_time = datetime.datetime.now()  # 更新心跳最新事件
+            logger.info('更新心跳时间：{}， 指令：{}'.format(datetime.datetime.now(), msg_str))
+        else:
+            logger.error('设备异常，心跳指令：{}'.format(msg_str))
+        time.sleep(2)
 
     @staticmethod
     def init_rsu_status_list():
@@ -123,16 +134,6 @@ class RsuStatus(object):
             # 关闭client
             client.shutdown(2)
             client.close()
-
-    @staticmethod
-    @func_set_timeout(12)
-    def rsu_heartbeat(rsu_client: RsuSocket):
-        msg_bytes = rsu_client.socket_client.recv(1024)
-        msg_str = msg_bytes.hex()
-        if msg_str[8: 12] == 'b200':
-            rsu_client.rsu_heartbeat_time = datetime.datetime.now()  # 更新心跳最新事件
-        else:
-            logger.error('设备异常： {}'.format(msg_str))
 
 
 if __name__ == '__main__':

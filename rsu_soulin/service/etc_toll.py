@@ -8,30 +8,148 @@
 import time
 import traceback
 import json
+from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from func_timeout import func_set_timeout
+from sqlalchemy import and_
 
-from common.config import CommonConf
+from common.config import CommonConf, StatusFlagConfig
+from common.db_client import create_db_session
 from common.log import logger
 from common.utils import CommonUtil
-from model.obu_model import OBUModel
+from model.db_orm import ETCRequestInfoOrm, RSUInfoOrm
+from service.db_operation import DBOPeration
 from service.rsu_socket import RsuSocket
+
+
+class TimingJob(object):
+
+    @staticmethod
+    def start_scheduler(rsu_client: RsuSocket):
+        logger.info('++++++++++++++++++++++++++++++++++++++++++++++')
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(TimingJob.check_rsu_status, args=(rsu_client,), trigger='cron', minute='*/1')  # 每一分钟检查一次天线状态
+        logger.info('lane_num: {} 启动定时任务'.format(rsu_client.lane_num))
+        scheduler.start()
+
+    @staticmethod
+    def check_rsu_status(rsu_client):
+        """
+        检查天线状态，心跳时间过长重启天线
+        """
+        _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                          sqlite_database='etc_deduct.sqlite')
+        rsu_info: RSUInfoOrm = db_session.query(RSUInfoOrm).filter(RSUInfoOrm.lane_num == rsu_client.lane_num).first()
+        # 如果三分钟内没有更新心跳，重启天线
+        if (datetime.now() - rsu_info.heartbeat_latest).seconds > 60 * 3:
+            rsu_client.rsu_status = StatusFlagConfig.RSU_FAILURE
+            logger.info('lane_num: {} 心跳不正常，数据库中最新心跳时间: {}， 对象的最新心跳时间： {}'.format(
+                rsu_client.lane_num, rsu_info.heartbeat_latest, rsu_client.rsu_heartbeat_time))
+            try:
+                rsu_client.init_rsu()
+            except:
+                logger.error(traceback.format_exc())
+            if rsu_client.rsu_status == StatusFlagConfig.RSU_FAILURE:
+                logger.info('**********重启天线失败**************')
+            else:
+                logger.info('**********重启天线成功**************')
+                rsu_info.heartbeat_latest = rsu_client.rsu_heartbeat_time
+                try:
+                    db_session.commit()
+                except:
+                    db_session.rollback()
+                    logger.error('重启天线后，更新数据库失败')
+        else:
+            logger.info('lane_num: {}， 心跳正常，数据库中最新心跳时间: {}， 对象的最新心跳时间： {}'.format(
+                rsu_client.lane_num, rsu_info.heartbeat_latest, rsu_client.rsu_heartbeat_time))
+        db_session.close()
 
 
 class EtcToll(object):
     @staticmethod
-    def etc_toll_by_thread(body: OBUModel):
-        begin = time.time()
-        result = EtcToll.toll(body)
-        logger.info('etc扣费结束，用时: {}s'.format(time.time() - begin))
-        print(result)
+    def etc_toll(rsu_client: RsuSocket):
+        DBOPeration.rsu_info_to_db(rsu_client)
+        TimingJob.start_scheduler(rsu_client)
+        while True:
+            now = datetime.now()
+            if (24 >= now.hour >= 20) or (0 <= now.hour <= 5):  # 0:00-5:00和20:00-24:00关闭天线
+                if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
+                    logger.info('-------------关闭天线---------------')
+                    rsu_client.close_socket()
+                    rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_OFF
+
+                rsu_client.rsu_heartbeat_time = now  # 更新心跳
+                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+                time.sleep(60)
+                logger.info('。。。当前天线处于休眠状态。。。')
+                continue
+            elif rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:   # 其它时间段打开天线
+                logger.info('-------------打开天线---------------')
+                rsu_client.init_rsu()
+                rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_ON
+
+            t1 = time.time()
+            # socket监听，接受数据
+            try:
+                msg_str = rsu_client.recv_msg_max_wait_time()
+            except:
+                err_msg = traceback.format_exc()
+                logger.error(err_msg)
+                if err_msg.find('远程主机强迫关闭了一个现有的连接') != -1 or err_msg.find('你的主机中的软件中止了一个已建立的连接') != -1 :
+                    time.sleep(30)
+                else:
+                    time.sleep(10)
+                continue
+            # 有接收到数据，表明天线还在工作，更新心跳时间
+            rsu_client.rsu_heartbeat_time = datetime.now()
+            if msg_str[6:16] == 'b2ffffffff':  # 心跳指令
+                logger.info('lane_num:{}  心跳指令：{}， 天线时间：{}， 当前时间：{}'.format(rsu_client.lane_num, msg_str,
+                                                                            rsu_client.rsu_heartbeat_time, datetime.now()))
+                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+                continue
+            # 检测到obu, 检测到obu时，会狂发b2指令，频繁的更新数据库，所以此种情况下不要更新天线心跳时间
+            if msg_str[6: 8] == 'b2':
+                logger.info('lane_num:{}  检测到obu: {}'.format(rsu_client.lane_num, msg_str))
+            else:
+                logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
+            # 查询数据库订单
+            t2 = time.time()
+            _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                              sqlite_database='etc_deduct.sqlite')
+            query_item: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
+                and_(ETCRequestInfoOrm.lane_num == rsu_client.lane_num,
+                     ETCRequestInfoOrm.create_time > (datetime.now() - timedelta(seconds=10)),
+                     ETCRequestInfoOrm.flag == 0)).first()
+            # 找到订单开始扣费
+            if query_item:
+                logger.info('开始扣费。。。。。。')
+                logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
+                etc_result = EtcToll.toll(query_item, rsu_client)
+                query_item.flag = 1
+                # 数据修改好后提交
+                try:
+                    db_session.commit()
+                except:
+                    db_session.rollback()
+                    logger.error(traceback.format_exc())
+                if etc_result['flag']:
+                    logger.info('...................扣费成功........................')
+                else:
+                    logger.info('...................扣费失败........................')
+            else:  # 没有查询到订单，pass
+                logger.info('........没有订单，继续监听心跳........')
+            db_session.close()
+            t3 = time.time()
+            logger.info('time3-time2 use: {}s,  time3-time1 use: {}s'.format(t3-t2, t3-t1))
 
     @staticmethod
     @func_set_timeout(CommonConf.FUNC_TIME_OUT)
-    def toll(body: OBUModel) -> dict:
+    def toll(body: ETCRequestInfoOrm, rsu_client: RsuSocket) -> dict:
         """
         etc收费
         :param body: 接收到的数据
+        :param rsu_client: socket客户端
         :return:
         """
         # 默认扣费失败
@@ -42,23 +160,19 @@ class EtcToll(object):
         if not CommonConf.ETC_DEDUCT_FLAG:
             return result
 
-        rsu_client: RsuSocket = CommonConf.RSU_SOCKET_STORE_DICT[body.lane_num]  # RsuSocket(body.lane_num)
         try:
             # etc开始扣费，并解析天线返回的数据
-            try:
-                msg = rsu_client.fee_deduction(body)
-            finally:
-                rsu_client.monitor_rsu_status_on = True  # 恢复开启心跳检测
+            msg = rsu_client.fee_deduction(body)
             # 如果扣费失败
-            if (type(msg) is dict) and (msg['flag'] is False):
+            if msg['flag'] is False:
                 result['errorMessage'] = msg['error_msg']
-            elif rsu_client.etc_charge_flag:  # 表示交易成功
+            else:  # 表示交易成功
                 # etc扣费成功后做进一步数据解析
                 handle_data_result = rsu_client.handle_data(body)
                 result['flag'] = handle_data_result['flag']
                 result['errorMessage'] = handle_data_result['error_msg']
                 params = handle_data_result['data']
-                # handle_data_result['flag']=Falase一般是存在黑名单
+                # handle_data_result['flag']=False一般是存在黑名单
                 if handle_data_result['flag'] and handle_data_result['data']:
                     # 交易时间格式转换
                     pay_time = CommonUtil.timeformat_convert(timestr1=params['exit_time'], format1='%Y%m%d%H%M%S',
@@ -74,9 +188,6 @@ class EtcToll(object):
                                 params=params, )
                     logger.info('etc交易成功')
                     logger.info(json.dumps(data, ensure_ascii=False))
-
-            else:
-                logger.error("etc扣费失败")
         except:
             logger.error(traceback.format_exc())
         # 记入日志
@@ -87,7 +198,27 @@ class EtcToll(object):
 
 
 if __name__ == '__main__':
-    obumodel = OBUModel()
-    obumodel.lane_num = '1'
-    obumodel.deduct_amount = 0.01
-    result = EtcToll.toll(obumodel)
+    # 查询数据库订单
+    _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                      sqlite_database='etc_deduct.sqlite')
+    query_item: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
+        and_(ETCRequestInfoOrm.lane_num == '002',
+             ETCRequestInfoOrm.create_time > (datetime.now() - timedelta(seconds=12000)),
+             ETCRequestInfoOrm.flag == 0)).order_by(ETCRequestInfoOrm.create_time.desc()).first()
+
+    # 找到订单开始扣费
+    if query_item:
+        logger.info('开始扣费。。。。。。')
+        logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
+        query_item.flag = 3
+        # 数据修改好后提交
+        try:
+            db_session.commit()
+        except:
+            db_session.rollback()
+            logger.error(traceback.format_exc())
+        logger.info('...................扣费成功........................')
+    else:
+        logger.info('........监听心跳........')
+
+    db_session.close()

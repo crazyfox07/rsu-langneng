@@ -1,3 +1,5 @@
+import concurrent
+import threading
 import time
 
 import uvicorn
@@ -17,6 +19,7 @@ from service.etc_toll import EtcToll
 from service.rsu_store import RsuStore
 from service.task_job import TimingOperateRsu
 from service.third_etc_api import ThirdEtcApi
+from threading import Thread
 
 app = FastAPI()
 
@@ -68,8 +71,9 @@ def init_scheduler():
     # scheduler.add_job(ThirdEtcApi.my_job2, trigger='cron', minute="*/5")
     # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
     # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
+
     scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
-    scheduler.add_job(RsuStatus.monitor_rsu_heartbeat, trigger='cron', second='*/30',
+    scheduler.add_job(RsuStatus.monitor_rsu_heartbeat, trigger='cron', second='*/10',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
     scheduler.add_job(TimingOperateRsu.turn_off_rsu, trigger='cron', hour='0', max_instances=2)
     scheduler.add_job(TimingOperateRsu.turn_on_rsu, trigger='cron', hour='5', max_instances=2)
@@ -82,6 +86,7 @@ def init_scheduler():
 def shutdown():
     logger.info('application shutdown')
 
+threadLock = threading.Lock()
 
 @app.post("/etc_fee_deduction")
 def etc_fee_deduction(body: OBUModel):
