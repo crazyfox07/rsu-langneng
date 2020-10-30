@@ -12,6 +12,7 @@ import traceback
 from sqlalchemy import and_
 
 from common.config import CommonConf
+from common.db_client import DBClient
 from common.http_client import http_session
 from common.log import logger
 from common.sign_verify import XlapiSignature
@@ -89,6 +90,8 @@ class ThirdEtcApi(object):
             }
         }
         data_json = json.dumps(data_dict, ensure_ascii=False)
+        print('+=' * 50)
+        print(data_json)
         sign = XlapiSignature.to_sign_with_private_key(data_json, private_key=ThirdEtcApi.PRIVATE_KEY)
         upload_body = dict(appid=ThirdEtcApi.APPID,
                            data=data_json,
@@ -99,6 +102,7 @@ class ThirdEtcApi(object):
             status = res_json['data']['status']
             exist_flag = True if str(status) == '1' else False
         except:
+            logger.error(res.text)
             logger.error('查询黑名单时出现异常： '.format(traceback.format_exc()))
             exist_flag = True
         return exist_flag

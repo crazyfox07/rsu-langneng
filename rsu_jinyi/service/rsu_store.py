@@ -5,12 +5,13 @@
 @file: rsu_store.py
 @time: 2020/9/17 17:20
 """
-from threading import Thread
-
+from concurrent.futures.process import ProcessPoolExecutor
 from common.config import CommonConf
 from common.log import logger
+from service.etc_toll import EtcToll
 from service.rsu_socket import RsuSocket
 
+executor = ProcessPoolExecutor(max_workers=2)
 
 class RsuStore(object):
 
@@ -24,8 +25,10 @@ class RsuStore(object):
         for rsu_item in rsu_list:
             lane_num = rsu_item['lane_num']
             if lane_num not in CommonConf.RSU_SOCKET_STORE_DICT:
-                rus_socket = RsuSocket(lane_num)
-                CommonConf.RSU_SOCKET_STORE_DICT[lane_num] = rus_socket
+                rsu_socket = RsuSocket(lane_num)
+                CommonConf.RSU_SOCKET_STORE_DICT[lane_num] = rsu_socket
+                logger.info('启动多进程')
+                executor.submit(EtcToll.etc_toll, rsu_socket)
         logger.info('=======================初始化天线集合=========================')
 
 

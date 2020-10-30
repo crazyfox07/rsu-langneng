@@ -73,7 +73,7 @@ class EtcToll(object):
         TimingJob.start_scheduler(rsu_client)
         while True:
             now = datetime.now()
-            if (24 >= now.hour >= 20) or (0 <= now.hour <= 5):  # 0:00-5:00和20:00-24:00关闭天线
+            if (24 >= now.hour >= 22) or (0 <= now.hour <= 4):  # 0:00-5:00和22:00-24:00关闭天线
                 if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
                     logger.info('-------------关闭天线---------------')
                     rsu_client.close_socket()
@@ -89,7 +89,6 @@ class EtcToll(object):
                 rsu_client.init_rsu()
                 rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_ON
 
-            t1 = time.time()
             # socket监听，接受数据
             try:
                 msg_str = rsu_client.recv_msg_max_wait_time()
@@ -114,7 +113,6 @@ class EtcToll(object):
             else:
                 logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
             # 查询数据库订单
-            t2 = time.time()
             _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                               sqlite_database='etc_deduct.sqlite')
             query_item: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
@@ -138,10 +136,8 @@ class EtcToll(object):
                 else:
                     logger.info('...................扣费失败........................')
             else:  # 没有查询到订单，pass
-                logger.info('........没有订单，继续监听心跳........')
+                pass
             db_session.close()
-            t3 = time.time()
-            logger.info('time3-time2 use: {}s,  time3-time1 use: {}s'.format(t3-t2, t3-t1))
 
     @staticmethod
     @func_set_timeout(CommonConf.FUNC_TIME_OUT)

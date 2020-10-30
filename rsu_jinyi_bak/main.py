@@ -1,5 +1,7 @@
-import multiprocessing
+import concurrent
+import threading
 import time
+
 import uvicorn
 import os
 import traceback
@@ -10,25 +12,19 @@ from fastapi import FastAPI
 
 from common.config import CommonConf
 from common.log import logger
-from model.db_orm import init_db, clear_table
+from model.db_orm import init_db
 from model.obu_model import OBUModel
 from service.check_rsu_status import RsuStatus
-from service.db_operation import DBOPeration
+from service.etc_toll import EtcToll
 from service.rsu_store import RsuStore
+from service.task_job import TimingOperateRsu
 from service.third_etc_api import ThirdEtcApi
+from threading import Thread
 
 app = FastAPI()
 
 # scheduler = AsyncIOScheduler()
 scheduler = BackgroundScheduler()
-
-
-@app.on_event('startup')
-def create_sqlite():
-    """数据库初始化"""
-    init_db()
-    # 清空表 rsu_info
-    clear_table()
 
 
 @app.on_event("startup")
@@ -37,6 +33,22 @@ def init_rsu_store_dict():
     初始化天线配置
     """
     RsuStore.init_rsu_store()
+
+
+#
+# @app.on_event('startup')
+# def init_rsu():
+#     """
+#     初始化天线，主要用于心跳检测
+#     :return:
+#     """
+#     RsuStatus.init_rsu_status_list()
+
+
+@app.on_event('startup')
+def create_sqlite():
+    """数据库初始化"""
+    init_db()
 
 
 @app.on_event('startup')
@@ -59,11 +71,12 @@ def init_scheduler():
     # scheduler.add_job(ThirdEtcApi.my_job2, trigger='cron', minute="*/5")
     # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
     # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
+
     scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
-    scheduler.add_job(RsuStatus.upload_rsu_heartbeat, trigger='cron', minute='*/1',
+    scheduler.add_job(RsuStatus.monitor_rsu_heartbeat, trigger='cron', second='*/10',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
-    # scheduler.add_job(TimingOperateRsu.turn_off_rsu, trigger='cron', hour='0', max_instances=2)
-    # scheduler.add_job(TimingOperateRsu.turn_on_rsu, trigger='cron', hour='5', max_instances=2)
+    scheduler.add_job(TimingOperateRsu.turn_off_rsu, trigger='cron', hour='0', max_instances=2)
+    scheduler.add_job(TimingOperateRsu.turn_on_rsu, trigger='cron', hour='5', max_instances=2)
     logger.info("启动调度器...")
 
     scheduler.start()
@@ -73,6 +86,7 @@ def init_scheduler():
 def shutdown():
     logger.info('application shutdown')
 
+threadLock = threading.Lock()
 
 @app.post("/etc_fee_deduction")
 def etc_fee_deduction(body: OBUModel):
@@ -84,8 +98,7 @@ def etc_fee_deduction(body: OBUModel):
 
     body.recv_time = time.time()
     try:
-        logger.info('=====================接收到扣费请求=====================')
-        DBOPeration.etc_request_info_to_db(body)
+        CommonConf.EXECUTOR.submit(EtcToll.etc_toll_by_thread, body)
         result = dict(flag=True,
                       errorCode='',
                       errorMessage='',
@@ -106,6 +119,5 @@ def head():
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
     # TODO workers>1时有问题，考虑gunicorn+uvicorn，同时考虑多进程的定时任务问题
     uvicorn.run(app="main:app", host="0.0.0.0", port=8001)

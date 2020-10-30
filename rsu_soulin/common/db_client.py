@@ -58,10 +58,10 @@ class DBClient(object):
         try:
             db_session.add(orm)
             db_session.commit()
-            logger.info('数据入库成功')
         except:
             db_session.rollback()
             logger.error(traceback.format_exc())
+            logger.info('数据入库失败')
 
     @staticmethod
     def update(db_session):
