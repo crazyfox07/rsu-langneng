@@ -108,6 +108,12 @@ class EtcToll(object):
                                                                             datetime.now()))
                 DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
                 continue
+            elif msg_str[8: 12] == 'b201':
+                logger.error('射频初始化异常： {}'.format(msg_str))
+                break
+            elif msg_str[8: 12] == 'b202':
+                logger.error('PSAM卡初始化异常或无卡： {}'.format(msg_str))
+                break
             # 检测到obu, 检测到obu时，会狂发b2指令，频繁的更新数据库，所以此种情况下不要更新天线心跳时间
             logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
             # 查询数据库订单
