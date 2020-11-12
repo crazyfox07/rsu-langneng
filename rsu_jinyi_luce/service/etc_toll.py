@@ -6,6 +6,7 @@
 @time: 2020/9/2 11:24
 """
 import pickle
+import threading
 import time
 import traceback
 import json
@@ -23,6 +24,7 @@ from model.third_db_orm import VehicleOweOrm
 from model.vehicle_owe_model import VehicleOweModel
 from service.db_operation import DBOPeration
 from service.rsu_socket import RsuSocket
+from service.third_etc_api import ThirdEtcApi
 
 
 class TimingJob(object):
@@ -114,11 +116,11 @@ class EtcToll(object):
                 continue
             # 有接收到数据，表明天线还在工作，更新心跳时间
             rsu_client.rsu_heartbeat_time = datetime.now()
+            DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
             if msg_str[8: 12] == 'b200':  # 心跳指令
                 logger.info('lane_num:{}  心跳指令：{}， 天线时间：{}， 当前时间：{}'.format(rsu_client.lane_num, msg_str,
                                                                             rsu_client.rsu_heartbeat_time,
                                                                             datetime.now()))
-                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
                 continue
             elif msg_str[8: 12] == 'b201':
                 logger.error('射频初始化异常： {}'.format(msg_str))
@@ -140,7 +142,10 @@ class EtcToll(object):
                 #     plate_no, plate_color = 'd4c141313131313100000000', '0000'
                 plate_no = CommonUtil.parse_plate_code(plate_no)
                 logger.info('车牌号： {}， 车颜色：{}'.format(plate_no, plate_color))
-
+                park_code = rsu_client.rsu_conf['park_code']  # 停车场
+                # 上传车辆信息
+                threading.Thread(target=ThirdEtcApi.upload_vehicle_plate_no,
+                                 args=(park_code, plate_no, plate_color)).start()
                 # TODO 该处为测试，待删，扣所有obu的车费
                 if plate_no:
                     plate_no_test = '鲁L12345'
@@ -157,7 +162,6 @@ class EtcToll(object):
                     logger.info('-------------车牌号：{}， 车颜色：{} 欠费，开始扣费----------'.format(plate_no, plate_color))
                     # etc_result = rsu_client.fee_deduction(body)
                     etc_result = EtcToll.toll(query_vehicle_owe, rsu_client)
-                    logger.info(json.dumps(etc_result))
                     if etc_result['flag'] is True:
                         logger.info('------------------------扣费成功--------------------------')
                         # TODO 后续成功扣费后需要删除数据库中的数据
@@ -166,8 +170,11 @@ class EtcToll(object):
 
                 else:
                     logger.info('车牌号：{}， 车颜色：{} 没有欠费'.format(plate_no, plate_color))
+
             else:
                 logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
+                if not msg_str:
+                    time.sleep(3)
 
     @staticmethod
     # @func_set_timeout(CommonConf.FUNC_TIME_OUT)

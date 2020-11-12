@@ -72,6 +72,39 @@ class ThirdEtcApi(object):
         return upload_flag, upload_fail_count
 
     @staticmethod
+    def upload_vehicle_plate_no(park_code, plate_no, plate_color):
+        """
+        上传车辆信息
+        @param vehicle_info_json:
+        @return:
+        """
+        params = dict(park_code=park_code,
+                      plate_no=plate_no,
+                      plate_color_code=str(int(plate_color, 16)),
+                      record_time=CommonUtil.timestamp_format(int(time.time()), format='%Y%m%d%H%M%S'))
+        vehicle_info_dict = dict(method='passThrough',
+                                 params=params)
+        vehicle_info_json = json.dumps(vehicle_info_dict, ensure_ascii=False)
+        # # 如果上传成功upload_flag=1， 上传失败upload_flag=0, 默认上传失败
+        upload_flag = 0
+        # 业务编码报文
+        # 将data 值base64 后，使用SHA256WithRSA 计算签名
+        sign = XlapiSignature.to_sign_with_private_key(vehicle_info_json, private_key=ThirdEtcApi.PRIVATE_KEY)
+        upload_body = dict(appid=ThirdEtcApi.APPID,
+                           data=vehicle_info_json,
+                           sign=sign.decode(encoding='utf8'))
+        logger.info('上传车辆信息： {}'.format(vehicle_info_json))
+        try:
+            res = http_session.post(ThirdEtcApi.ETC_UPLOAD_URL, data=upload_body)
+            if res.json()['code'] == '000000':
+                upload_flag = 1
+            logger.info(res.json())
+        except:
+            logger.error(traceback.format_exc())
+        upload_fail_count = 0 if upload_flag else 1
+        return upload_flag, upload_fail_count
+
+    @staticmethod
     def exists_in_blacklist(issuer_identifier, card_net, card_id):
         """
         通过第三方接口查询card_net+card_sn是否在黑名单中
@@ -249,7 +282,9 @@ class ThirdEtcApi(object):
 
 if __name__ == '__main__':
     print('start')
-    ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
+    res = ThirdEtcApi.upload_vehicle_plate_no('371143', '鲁L12345', '0')
+    print(res)
+    # ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
     # query_items = db_session.query(ETCFeeDeductInfoOrm).filter(
     #     and_(ETCFeeDeductInfoOrm.create_time > (datetime.now() - timedelta(seconds=3600)),
     #          ETCFeeDeductInfoOrm.upload_flag == 0))

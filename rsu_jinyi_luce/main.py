@@ -40,7 +40,7 @@ def init_rsu_store_dict():
     RsuStore.init_rsu_store()
 
 
-# @app.on_event('startup')
+#.
 def init_scheduler():
     """初始化调度器"""
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')

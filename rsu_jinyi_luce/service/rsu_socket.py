@@ -108,6 +108,7 @@ class RsuSocket(object):
         self.command_recv_set.parse_b0(b0)
         if b0[10: 12] == '00':
             self.rsu_status = StatusFlagConfig.RSU_NORMAL
+            self.rsu_heartbeat_time = datetime.datetime.now()
         else:
             self.rsu_status = StatusFlagConfig.RSU_FAILURE
         t2 = time.time()
