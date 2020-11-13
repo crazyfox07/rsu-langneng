@@ -76,9 +76,12 @@ class EtcToll(object):
                 plate_no = CommonUtil.parse_plate_code(plate_no)
                 logger.info('车牌号： {}， 车颜色：{}'.format(plate_no, plate_color))
                 park_code = rsu_client.rsu_conf['park_code']  # 停车场
-                # 上传车辆信息
-                threading.Thread(target=ThirdEtcApi.upload_vehicle_plate_no,
-                                 args=(park_code, plate_no, plate_color)).start()
+                if plate_no:
+                    # 上传车辆信息
+                    threading.Thread(target=ThirdEtcApi.upload_vehicle_plate_no,
+                                     args=(park_code, plate_no, plate_color)).start()
+                else:
+                    logger.error('读到的车牌号为空。。。。。。。')
                 # TODO 该处为测试，待删，扣所有obu的车费
                 if plate_no:
                     plate_no_test = '鲁L12345'

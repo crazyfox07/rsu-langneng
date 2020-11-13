@@ -62,6 +62,8 @@ class CommonConf(object):
     EXECUTOR = ThreadPoolExecutor(max_workers=3)
     # wait_time_between_command
     OBU_COMMAND_WAIT_TIME = ETC_CONF_DICT['obu']['wait_time_between_command']
+    # 当前天线的进程
+    RSU_PROCESS = None
 
 
 class StatusFlagConfig(Enum):

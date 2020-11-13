@@ -90,8 +90,6 @@ class ThirdEtcApi(object):
             }
         }
         data_json = json.dumps(data_dict, ensure_ascii=False)
-        print('+=' * 50)
-        print(data_json)
         sign = XlapiSignature.to_sign_with_private_key(data_json, private_key=ThirdEtcApi.PRIVATE_KEY)
         upload_body = dict(appid=ThirdEtcApi.APPID,
                            data=data_json,
@@ -102,7 +100,6 @@ class ThirdEtcApi(object):
             status = res_json['data']['status']
             exist_flag = True if str(status) == '1' else False
         except:
-            logger.error(res.text)
             logger.error('查询黑名单时出现异常： '.format(traceback.format_exc()))
             exist_flag = True
         return exist_flag
@@ -220,7 +217,6 @@ class ThirdEtcApi(object):
             logger.info('暂停收费')
         elif (command is None) or (command == '11'):
             CommonConf.ETC_CONF_PATH = True
-        logger.info(res.json())
 
     @staticmethod
     def etc_deduct_notify(parkCode, outTradeNo, derateFee, payFee, payTime):

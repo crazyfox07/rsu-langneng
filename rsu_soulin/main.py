@@ -27,19 +27,23 @@ scheduler = BackgroundScheduler()
 def create_sqlite():
     """数据库初始化"""
     init_db()
-    # 清空表 rsu_info
-    clear_table()
 
-
-@app.on_event("startup")
-def init_rsu_store_dict():
-    """
-    初始化天线配置
-    """
-    RsuStore.init_rsu_store()
-
-
+# @app.on_event("startup")
+# def init_rsu_store_dict():
+#     """
+#     初始化天线配置
+#     """
+#     RsuStore.init_rsu_store()
 @app.on_event('startup')
+def start_rsu_control():
+    """
+    启动天线
+    @return:
+    """
+    RsuStatus.restart_rsu_control()
+
+
+# @app.on_event('startup')
 def init_scheduler():
     """初始化调度器"""
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')
@@ -54,24 +58,14 @@ def init_scheduler():
     }
 
     scheduler.configure(jobstores=jobstores, executors=executors)
-
-    # scheduler.add_job(ThirdEtcApi.my_job1, trigger='cron', minute="*/2", max_instances=2)
-    # scheduler.add_job(ThirdEtcApi.my_job2, trigger='cron', minute="*/5")
-    # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
-    # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
+    # 查找数据库中没能成功上传的数据，重新上传
     scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
-    scheduler.add_job(RsuStatus.upload_rsu_heartbeat, trigger='cron', minute='*/1',
+    # 检测天线心跳状态， 心跳停止过长，重启天线
+    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
-    # scheduler.add_job(TimingOperateRsu.turn_off_rsu, trigger='cron', hour='0', max_instances=2)
-    # scheduler.add_job(TimingOperateRsu.turn_on_rsu, trigger='cron', hour='5', max_instances=2)
     logger.info("启动调度器...")
 
     scheduler.start()
-
-
-@app.on_event("shutdown")
-def shutdown():
-    logger.info('application shutdown')
 
 
 @app.post("/etc_fee_deduction")

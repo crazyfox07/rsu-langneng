@@ -7,8 +7,11 @@
 """
 from common.config import CommonConf
 from common.log import logger
+from service.etc_toll import EtcToll
 from service.rsu_socket import RsuSocket
+from concurrent.futures import ProcessPoolExecutor
 
+executor = ProcessPoolExecutor(max_workers=2)
 
 class RsuStore(object):
 
@@ -22,10 +25,10 @@ class RsuStore(object):
         for rsu_item in rsu_list:
             lane_num = rsu_item['lane_num']
             if lane_num not in CommonConf.RSU_SOCKET_STORE_DICT:
-                rus_socket = RsuSocket(lane_num)
-                CommonConf.RSU_SOCKET_STORE_DICT[lane_num] = rus_socket
-                # 启动多线程监听天线状态
-                # CommonConf.EXECUTOR.submit(rus_socket.monitor_rsu_status, 'thread1')
+                rsu_socket = RsuSocket(lane_num)
+                CommonConf.RSU_SOCKET_STORE_DICT[lane_num] = rsu_socket
+                logger.info('启动多进程')
+                executor.submit(EtcToll.etc_toll, rsu_socket)
         logger.info('=======================初始化天线集合=========================')
 
 

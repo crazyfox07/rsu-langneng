@@ -8,7 +8,7 @@ etc:
     trans_mode: '01'  # 交易模式
     wait_time: '02'  # 最小重读时间
     pll_channel_id: '00'  # 信道号
-    tx_power: 8  # 天线功率，十进制
+    tx_power: 2  # 天线功率，十进制
     obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
     device_no: "lanneng - 3202001001"# 设备号 32位
     device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
@@ -22,7 +22,7 @@ etc:
 #  passworld: "aabbcc"
 #  db_name: "test01"
 
-sqlite_dir: 'D:\\rsucontroller\\sqlite_db'
+sqlite_dir: 'D:\\lxw\\project\\rsu-langneng\\rsu_soulin\\sqlite_db'   # '/root/rsu/sqlite_db'
 
 thirdApi:  # 第三方接口
   url: 'http://58.59.49.122:8810/api/gateway/etc' # 'http://lnetc1.c2s.pub:6868/etc/api/gateway/etc' #

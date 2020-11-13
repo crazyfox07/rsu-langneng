@@ -53,6 +53,7 @@ class RSUInfoOrm(Base):
     id = Column('id', String(32), primary_key=True)
     lane_num = Column('lane_num', String(16))
     park_code = Column('park_code', String(16))
+    sn = Column('sn', String(32))
     heartbeat_latest = Column('heartbeat_latest', DateTime)  # 天线的最新心跳时间
 
 
