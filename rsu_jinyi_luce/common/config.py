@@ -66,6 +66,8 @@ class CommonConf(object):
     VEHICLE_OWE_DICT = dict()
     # 车辆欠费拉取文件路径
     VEHICLE_OWE_FILE_PATH = os.path.join(ROOT_DIR, 'common', 'vehicle_owe_list.txt')
+    # 当前天线的进程
+    RSU_PROCESS = None
 
 
 class StatusFlagConfig(Enum):
@@ -86,4 +88,4 @@ os.makedirs(CommonConf.SQLITE_DIR, exist_ok=True)
 
 
 if __name__ == '__main__':
-    print(CommonConf.SOCKET_TIME_OUT)
+    print([item['lane_num'] for item in CommonConf.ETC_CONF_DICT['etc']])

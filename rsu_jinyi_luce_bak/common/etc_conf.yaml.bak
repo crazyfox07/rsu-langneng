@@ -1,0 +1,41 @@
+dev_code: '00000001'  # 设备编号，运行本代码的机器编号，非天线
+etc:
+  - lane_num: '002'   # 车道号
+    park_code: '371143'  # 停车场编号
+    ip: '192.168.4.77'  # 天线ip
+    port: 60001   # 天线端口
+    lane_mode: '04'   # 车道工作模式
+    trans_mode: '01'  # 交易模式
+    wait_time: '02'  # 最小重读时间
+    pll_channel_id: '00'  # 信道号
+    tx_power: 20  # 天线功率，十进制
+    obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
+    device_no: "lanneng - 3202001001"# 设备号 32位
+    device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
+    sn: 'soulin-212-1910-010'  # 天线sn编号
+
+# 目前还没有用到mysql数据库
+#mysql:
+#  host: '192.168.1.100'
+#  port: 3306
+#  username: "test"
+#  passworld: "aabbcc"
+#  db_name: "test01"
+
+sqlite_dir: 'D:\\rsucontroller\\sqlite_db'
+
+thirdApi:  # 第三方接口
+  url: 'http://lnetc1.c2s.pub:6868/etc/api/gateway/etc'  # 'http://58.59.49.122:8810/api/gateway/etc' # 
+  app_id: '882845749296461a873c0627b929d6bb'
+  private_key: 'MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCF8jiEHaTtrL2KSoBaBZdGhp++BKt/r0M9HiMD6MAVnsaw7hsEsi583USFhZsklURgGlqvHc/JwkJGr5egASf2SXRPECkdL1VAx/UX+EV6hnx3pdlqpPrgNESpydY9rVD6gWfQHOZ3ToO3ckucP70L0NcdeVf0aWKvA2vdaQc7g2jtJqmRg50mPAlZLegtUjQ/bIWlw7nUY3Y3BwuX339L3Yl3jrWLTqqW6AS2sOzdQM506HQOLgm16uxYFYmvB5hXhz4MUcTpkaw6/B/sF4FmDDPTmzm5ZCnV2U2BbA6tXRiLj92cOgQfP1RhK5x4Zc2o259IGqJq+Im7anZIzMOvAgMBAAECggEAB6oSfczMcSUfO1iD+6KyQ0DUxySxQ38d09NzoXeh9hq9t8YIGb6wVki68QDyHafE39LiOX71MtBAxpapkGhAhyEw3I1KLPdWY3yNk6+LGjWzzYzZ4fZKvKWBAE4iSikupwbcj9X3ggAmHUsW9HvZL2HlzTPySnP1R5pkg6jM1yTZvTJ0UFAgLgrHZYnKmdbCgs68LM+nU9MYC/TCam3sJvMU2MP3SKJXzdgj4QgBcv/qFroVy/7t6LFb3wdnVgF+q7aF/Xd+qq4MkguSs8Q1I1cyWsBTh7vYkc7parwXBRqB2KQF6Dwy4VXVjpFjAzKyQjiYaiouzpTk+uAXOJUI0QKBgQD2kAIjnAdVqadxub1PEdC94qEGETnk/Y2b7rFV0lQeQq6oQ91H7zGQUWaZp6frZ8pSdjjDww5hzH1tqv+AMmjzjE2fPNEHLuuOPOsswtjH9mB7H3dQBK5l9I9OqkdHdrrJaC8yZ/xBoJL2284vVdK0xGOf3NVMumgdLmsP8BuBKwKBgQCLErgDPoA0fz7jPZnSVxPwUPfN+zkheFNV6PrA4uBDWT51Wd3vRohjTdZ/Un2Shm+4TH+X2TSNUEmMTY/vuOklDX+upisgKF9xrlIpaPGoZoANOKrs15GQKFJgfGH2PGaUSEAi7RmjiJdqMOxE0VttwOlp3PZaJKNLqXXEgi5djQKBgFoU8zMfZm6dtVePjOK+l41Ip5wX3xcSrBI0ewXn+mOz6SwA32/QrEMV+m5ZGrifCwRlvQeI1FBW7dyLhR3JTR7uO83Z4mTFd7pX93Q7HAiysz1Imcbabv1BBLqw66nobwX20oeQBlHT4N3gIMyahokU13EotaV61V8T/nmsN+BRAoGAQBCZb/Ukvgo4ABpqd7jhWH0UCnFGOiLh0NuIV76rrJq56PlDAWyue4Bp5TEs44jGglHLHTpTuR1ZJCa+vaGi1QzI2r11dFTk0suI0cakO/0r0+tc4cnUJmJMwGHMBtCAOKKn2O78Npc/mQ18aZ8/zOlnHPtLCO+DweEIfUOy9CkCgYAXfwiqceXl35D3pM08Mf+ySaFtXgMhkecaBoPxUqQKVW4YHSDrsIc07lNNmSbkMQDKfEbqAZPRqvfddShbFmA2Qwkzpd6v7lGj6xMsSmCi3kuXUu4ZyusGMb/NHxyjtCCui9r2CkRW9REhQUXgq6xFKJ/StGb+5TJgiym/NrLe4A=='
+  public_key_etc: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhfI4hB2k7ay9ikqAWgWXRoafvgSrf69DPR4jA+jAFZ7GsO4bBLIufN1EhYWbJJVEYBparx3PycJCRq+XoAEn9kl0TxApHS9VQMf1F/hFeoZ8d6XZaqT64DREqcnWPa1Q+oFn0Bzmd06Dt3JLnD+9C9DXHXlX9GlirwNr3WkHO4No7SapkYOdJjwJWS3oLVI0P2yFpcO51GN2NwcLl99/S92Jd461i06qlugEtrDs3UDOdOh0Di4JtersWBWJrweYV4c+DFHE6ZGsOvwf7BeBZgwz05s5uWQp1dlNgWwOrV0Yi4/dnDoEHz9UYSuceGXNqNufSBqiaviJu2p2SMzDrwIDAQAB'
+  etc_deduct_notify_url:  'http://127.0.0.1:9000/park/etcPayDetail/' # etc扣费下发url
+
+obu:
+  wait_time_between_command: 0.002 # obu命令之间的等待时间
+
+debug: 'false'  # debug位true模式下扣费一分
+func_time_out: 6  # 方法超时时间， 单位秒
+socket_time_out: 0.5 # socket连接超时设置， 单位秒
+detect_obu_time_latest_diff: 1  # 如果检测到obu的时间距离第三方调用etc接口扣费时间不超detect_obu_time_latest_diff秒,则启用etc扣费，否则禁用
+etc_heartbeat_time_out: 150 # 心跳超时时间，单位秒

@@ -6,14 +6,60 @@ import string
 import traceback
 import zipfile
 import requests
+import os
+import re
+import sys
 
 from common.config import CommonConf
 from datetime import datetime
-
 from common.log import logger
 
 
 class CommonUtil(object):
+
+    # @staticmethod
+    # def restart_rsu_control():
+    #     """
+    #     重启天线服务
+    #     @return:
+    #     """
+    #     pass
+        # logger.info('===========重启天线============')
+        # rsu_script_filename = 'main2.py'
+        # # 找出进程号
+        # pids = CommonUtil.query_pids(rsu_script_filename)
+        # if pids:
+        #     os.system('kill -9 {}'.format(pids))  # 杀死进程
+        #     logger.info('kill -9 {}'.format(pids))
+        # # 重启天线
+        # rsu_script_path = os.path.join(CommonConf.ROOT_DIR, rsu_script_filename)
+        # os.system('nohup python3 {} &'.format(rsu_script_path))
+
+    @staticmethod
+    def query_pids(query_str):
+        """
+        查找query_str相关的进程号
+        @return:
+        """
+        pid_list = []
+        items = os.popen('ps -ef|grep {}'.format(query_str)).readlines()
+        for item in items:
+            if item.find('grep') == -1:
+                pid = re.split('\s+', item)[1]
+                pid_list.append(pid)
+        pids = ' '.join(pid_list)
+        return pids
+
+    @staticmethod
+    def restart_program():
+        """
+        程序重启
+        @return:
+        """
+        logger.info("。。。。。。。重启。。。。。。。")
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
+
     @staticmethod
     def timestamp_format(timestamp=int(time.time()), format='%Y%m%d%H%M%S'):
         """

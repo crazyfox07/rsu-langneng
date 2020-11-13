@@ -1,9 +1,6 @@
 import multiprocessing
-import time
-
 import uvicorn
 import os
-import traceback
 from apscheduler.executors.pool import ProcessPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -11,11 +8,9 @@ from fastapi import FastAPI, UploadFile, File
 
 from common.config import CommonConf
 from common.log import logger
-from model.db_orm import init_db, clear_table
-from model.obu_model import OBUModel
+from model.db_orm import init_db
 from service.check_rsu_status import RsuStatus
-from service.db_operation import DBOPeration
-from service.rsu_store import RsuStore
+
 from service.third_etc_api import ThirdEtcApi
 
 app = FastAPI()
@@ -28,19 +23,17 @@ scheduler = BackgroundScheduler()
 def create_sqlite():
     """数据库初始化"""
     init_db()
-    # 清空表 rsu_info
-    clear_table()
 
-
-@app.on_event("startup")
-def init_rsu_store_dict():
+@app.on_event('startup')
+def start_rsu_control():
     """
-    初始化天线配置
+    启动天线
+    @return:
     """
-    RsuStore.init_rsu_store()
 
+    RsuStatus.restart_rsu_control()
 
-#.
+@app.on_event('startup')
 def init_scheduler():
     """初始化调度器"""
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')
@@ -51,7 +44,7 @@ def init_scheduler():
     }
     executors = {
         'default': {'type': 'threadpool', 'max_workers': 10},  # 最大工作线程数20
-        'processpool': ProcessPoolExecutor(max_workers=1)  # 最大工作进程数为5
+        'processpool': ProcessPoolExecutor(max_workers=3)  # 最大工作进程数为5
     }
 
     scheduler.configure(jobstores=jobstores, executors=executors)
@@ -59,8 +52,8 @@ def init_scheduler():
     # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
     # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
 
-    scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
-    scheduler.add_job(RsuStatus.upload_rsu_heartbeat, trigger='cron', minute='*/1',
+    # scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
+    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
     logger.info("启动调度器...")
 

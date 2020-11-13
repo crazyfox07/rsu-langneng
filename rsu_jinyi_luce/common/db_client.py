@@ -127,7 +127,7 @@ class DBClient(object):
                                              receivable_total_amount=0.00,
                                              entrance_time='20201109101010',
                                              exit_time='20201109105012',
-                                             park_record_time='40分钟2秒')
+                                             park_record_time='1秒')
         vehicle_owe_orm_items = [vehicle_owe_orm_item, vehicle_owe_orm_item2]
 
         try:
