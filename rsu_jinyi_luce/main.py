@@ -1,9 +1,11 @@
 import multiprocessing
 import uvicorn
 import os
+from apscheduler import events
 from apscheduler.executors.pool import ProcessPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from fastapi import FastAPI, UploadFile, File
 
 from common.config import CommonConf
@@ -17,6 +19,7 @@ app = FastAPI()
 
 # scheduler = AsyncIOScheduler()
 scheduler = BackgroundScheduler()
+# scheduler = BlockingScheduler()
 
 
 @app.on_event('startup')
@@ -24,18 +27,28 @@ def create_sqlite():
     """数据库初始化"""
     init_db()
 
+
 @app.on_event('startup')
 def start_rsu_control():
     """
     启动天线
     @return:
     """
-
     RsuStatus.restart_rsu_control()
+
 
 @app.on_event('startup')
 def init_scheduler():
     """初始化调度器"""
+
+    def my_listener(event):
+        """事件监听"""
+        if event.exception:
+            logger.exception('========== The job crashed :( ==========')
+            logger.exception(str(event.exception))
+        else:
+            logger.info('============ The job worked :) ===========')
+
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')
     # 每次启动任务时删除数据库
     os.remove(job_sqlite_path) if os.path.exists(job_sqlite_path) else None
@@ -46,15 +59,21 @@ def init_scheduler():
         'default': {'type': 'threadpool', 'max_workers': 10},  # 最大工作线程数20
         'processpool': ProcessPoolExecutor(max_workers=3)  # 最大工作进程数为5
     }
+    job_defaults = {
+        'coalesce': False,
+        'max_instances': 3
+    }
 
-    scheduler.configure(jobstores=jobstores, executors=executors)
+    scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
 
     # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
     # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
 
     # scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
     scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1',
-                      kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
+                      kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2, id='check_rsu_heartbeat')
+
+    scheduler.add_listener(my_listener, events.EVENT_JOB_EXECUTED | events.EVENT_JOB_ERROR)
     logger.info("启动调度器...")
 
     scheduler.start()
