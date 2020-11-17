@@ -7,7 +7,7 @@ block_cipher = None
 
 
 a = Analysis(['main.py'],
-             pathex=['E:\\lxw\\project\\rsu-langneng\\rsu_soulin'],
+             pathex=[],
              binaries=[],
              datas=[('./common/etc_conf.yaml', './common'), ('./deploy', 'deploy'), ('./sqlite_db', './sqlite_db')],
              hiddenimports= ['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols',

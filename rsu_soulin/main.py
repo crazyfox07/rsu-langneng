@@ -3,6 +3,8 @@ import time
 import uvicorn
 import os
 import traceback
+
+from apscheduler import events
 from apscheduler.executors.pool import ProcessPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -43,9 +45,17 @@ def start_rsu_control():
     RsuStatus.restart_rsu_control()
 
 
-# @app.on_event('startup')
+@app.on_event('startup')
 def init_scheduler():
     """初始化调度器"""
+
+    def my_listener(event):
+        """事件监听"""
+        if event.exception:
+            logger.exception('========== The job crashed :( ==========')
+            logger.exception(str(event.exception))
+        else:
+            logger.info('============ The job worked :) ===========')
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')
     # 每次启动任务时删除数据库
     os.remove(job_sqlite_path) if os.path.exists(job_sqlite_path) else None
@@ -59,10 +69,12 @@ def init_scheduler():
 
     scheduler.configure(jobstores=jobstores, executors=executors)
     # 查找数据库中没能成功上传的数据，重新上传
-    scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
+    scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1',
+                      id='reupload_etc_deduct_from_db')
     # 检测天线心跳状态， 心跳停止过长，重启天线
-    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1',
+    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1', id='check_rsu_heartbeat',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
+    scheduler.add_listener(my_listener, events.EVENT_JOB_EXECUTED | events.EVENT_JOB_ERROR)
     logger.info("启动调度器...")
 
     scheduler.start()
