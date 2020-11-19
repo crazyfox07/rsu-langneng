@@ -60,9 +60,10 @@ def init_scheduler():
         'processpool': ProcessPoolExecutor(max_workers=3)  # 最大工作进程数为5
     }
     job_defaults = {
-        'coalesce': False,
+        'coalesce': True,
         'max_instances': 3
     }
+    scheduler._logger = logger
 
     scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
 

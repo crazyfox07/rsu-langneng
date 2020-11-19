@@ -66,8 +66,13 @@ def init_scheduler():
         'default': {'type': 'threadpool', 'max_workers': 10},  # 最大工作线程数20
         'processpool': ProcessPoolExecutor(max_workers=1)  # 最大工作进程数为5
     }
+    job_defaults = {
+        'coalesce': True,
+        'max_instances': 3
+    }
+    scheduler._logger = logger
 
-    scheduler.configure(jobstores=jobstores, executors=executors)
+    scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
     # 查找数据库中没能成功上传的数据，重新上传
     scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1',
                       id='reupload_etc_deduct_from_db')
