@@ -18,8 +18,9 @@ from common.config import CommonConf, StatusFlagConfig
 from common.db_client import create_db_session
 from common.log import logger
 from common.utils import CommonUtil
-from model.db_orm import ETCRequestInfoOrm, RSUInfoOrm
+from model.db_orm import ETCRequestInfoOrm
 from service.db_operation import DBOPeration
+from service.db_rsu_charge import DBRsuCharge
 from service.rsu_socket import RsuSocket
 
 
@@ -72,6 +73,14 @@ class EtcToll(object):
         # TimingJob.start_scheduler(rsu_client)
         while True:
             now = datetime.now()
+            # 查询天线的计费状态，charge=1开启计费，charge=0关闭计费
+            rsu_charge = DBRsuCharge.query_rsu_charge()
+            if rsu_charge == 0:
+                rsu_client.rsu_heartbeat_time = now  # 更新心跳
+                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+                time.sleep(30)
+                continue
+
             if 0 <= now.hour <= 4:  # 0:00-5:00和22:00-24:00关闭天线
                 if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
                     logger.info('-------------关闭天线---------------')

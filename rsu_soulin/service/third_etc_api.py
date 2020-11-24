@@ -12,7 +12,6 @@ import traceback
 from sqlalchemy import and_
 
 from common.config import CommonConf
-from common.db_client import DBClient
 from common.http_client import http_session
 from common.log import logger
 from common.sign_verify import XlapiSignature
@@ -21,6 +20,7 @@ from datetime import datetime, timedelta
 import time
 
 from model.db_orm import db_session, ETCFeeDeductInfoOrm
+from service.db_rsu_charge import DBRsuCharge
 
 
 class ThirdEtcApi(object):
@@ -210,13 +210,19 @@ class ThirdEtcApi(object):
                            sign=sign.decode(encoding='utf8'))
         res = http_session.post(ThirdEtcApi.ETC_UPLOAD_URL, data=upload_body)
         command = res.json()['command']
+        # 查询天线的计费状态，charge=1开启计费，charge=0关闭计费
+        rsu_charge = DBRsuCharge.query_rsu_charge()
         # 00：暂停收费
         # 11：正常收费（默认）
         if command == '00':
-            CommonConf.ETC_CONF_PATH = False
-            logger.info('暂停收费')
-        elif (command is None) or (command == '11'):
-            CommonConf.ETC_CONF_PATH = True
+            logger.info('暂停etc收费')
+            if rsu_charge == 1:
+                DBRsuCharge.update_rsu_charge_on_off(charge=0, update_time=datetime.now())
+
+        else:
+            if rsu_charge == 0:
+                logger.info('开启etc收费')
+                DBRsuCharge.update_rsu_charge_on_off(charge=1, update_time=datetime.now())
 
     @staticmethod
     def etc_deduct_notify(parkCode, outTradeNo, derateFee, payFee, payTime):
@@ -249,7 +255,16 @@ class ThirdEtcApi(object):
 
 if __name__ == '__main__':
     print('start')
-    ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
+    params={
+        "park_code": "371143",
+        "dev_code": "00000001",
+        "status_code": "11",
+        "rsu_broke_list": [],
+        "black_file_version": "0",
+        "black_file_version_incr": "0"
+    }
+    ThirdEtcApi.tianxian_heartbeat(params)
+    # ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
     # query_items = db_session.query(ETCFeeDeductInfoOrm).filter(
     #     and_(ETCFeeDeductInfoOrm.create_time > (datetime.now() - timedelta(seconds=3600)),
     #          ETCFeeDeductInfoOrm.upload_flag == 0))

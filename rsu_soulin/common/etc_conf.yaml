@@ -22,7 +22,7 @@ etc:
 #  passworld: "aabbcc"
 #  db_name: "test01"
 
-sqlite_dir: 'D:\\lxw\\project\\rsu-langneng\\rsu_soulin\\sqlite_db'   # '/root/rsu/sqlite_db'
+#sqlite_dir: 'D:\\lxw\\project\\rsu-langneng\\rsu_soulin\\sqlite_db'   # '/root/rsu/sqlite_db'
 
 thirdApi:  # 第三方接口
   url: 'http://58.59.49.122:8810/api/gateway/etc' # 'http://lnetc1.c2s.pub:6868/etc/api/gateway/etc' #

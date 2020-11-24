@@ -16,7 +16,6 @@ from model.db_orm import init_db, clear_table
 from model.obu_model import OBUModel
 from service.check_rsu_status import RsuStatus
 from service.db_operation import DBOPeration
-from service.rsu_store import RsuStore
 from service.third_etc_api import ThirdEtcApi
 
 app = FastAPI()
