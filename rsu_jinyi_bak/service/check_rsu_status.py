@@ -5,14 +5,15 @@
 @file: check_rsu_status.py
 @time: 2020/9/15 15:32
 """
-import time
 import traceback
 import socket
 import datetime
 from func_timeout import func_set_timeout
 
-from common.config import CommonConf, StatusFlagConfig
+from common.config import CommonConf
+from common.db_client import create_db_session
 from common.log import logger
+from model.db_orm import RSUInfoOrm
 from service.command_receive_set import CommandReceiveSet
 from service.command_send_set import CommandSendSet
 from service.rsu_socket import RsuSocket
@@ -20,12 +21,15 @@ from service.rsu_socket import RsuSocket
 
 class RsuStatus(object):
     @staticmethod
-    def monitor_rsu_heartbeat(callback):
+    def upload_rsu_heartbeat(callback):
         """
-        监听天线心跳
+        上传天线心跳
         : callback: 回调函数
         :return:
         """
+        _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                                  sqlite_database='etc_deduct.sqlite')
+
         # 定义要上传的天线心跳字典
         upload_rsu_heartbeat_dict = dict(park_code=CommonConf.ETC_CONF_DICT['etc'][0]['park_code'],
                                          dev_code=CommonConf.ETC_CONF_DICT['dev_code'], # 设备编号，运行本代码的机器编号，非天线
@@ -34,38 +38,21 @@ class RsuStatus(object):
                                          black_file_version='0',
                                          black_file_version_incr='0'
                                          )
-        logger.info('。。。。。。。。。。。。。。。。。监听心跳。。。。。。。。。。。。。。。')
+        query_items = db_session.query(RSUInfoOrm).all()
+        now = datetime.datetime.now()
+        # 读取天线配置文件
+        rsu_conf_list = CommonConf.ETC_CONF_DICT['etc']
+        for rsu_item in query_items:
+            # 假如3分钟没有心跳，则认为天线出故障
+            logger.info('距离心跳时间更新：{}s'.format((now - rsu_item.heartbeat_latest).seconds))
+            if (now - rsu_item.heartbeat_latest).seconds > 60 * 3:
+                rsu_conf = next(filter(lambda item: item['lane_num'] == rsu_item.lane_num, rsu_conf_list))
+                upload_rsu_heartbeat_dict['rsu_broke_list'].append(rsu_conf['sn'])  # 天线sn编号
 
-        for lane_num, rsu_client in CommonConf.RSU_SOCKET_STORE_DICT.items():
-            if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:
-                logger.info('。。。天线处于休眠状态。。。')
-                continue
-            if rsu_client.monitor_rsu_status_on == False:  # 处于扣费阶段，关闭心跳：
-                logger.info('处于扣费阶段，关闭心跳')
-                continue
-
-            RsuStatus.rsu_heartbeat(rsu_client)  # 打开心跳检测
-            now = datetime.datetime.now()
-            # 假如三分钟没有心跳，则认为天线出故障，并重启socket
-            logger.info('距离心跳时间更新：{}s'.format((now - rsu_client.rsu_heartbeat_time).seconds))
-            if (now - rsu_client.rsu_heartbeat_time).seconds > 60 * 3:
-                rsu_client.rsu_status = StatusFlagConfig.RSU_FAILURE
-                #  重启socket
-                try:
-                    rsu_client.init_rsu()
-                except:
-                    logger.error(traceback.format_exc())
-                if rsu_client.rsu_status == StatusFlagConfig.RSU_FAILURE:
-                    logger.info('**********重启天线失败**************')
-                    # 将出现故障的天线的sn加入到rsu_broke_list列表中
-                    upload_rsu_heartbeat_dict['rsu_broke_list'].append(rsu_client.rsu_conf['sn'])
-                else:
-                    logger.info('**********重启天线成功**************')
-            else:
-                rsu_client.rsu_status = StatusFlagConfig.RSU_NORMAL
         if upload_rsu_heartbeat_dict['rsu_broke_list']:
             upload_rsu_heartbeat_dict['status_code'] = '01'
-        # callback(upload_rsu_heartbeat_dict)
+            logger.info('天线 {} 出现故障'.format(','.join(upload_rsu_heartbeat_dict['rsu_broke_list'])))
+        callback(upload_rsu_heartbeat_dict)
 
     @staticmethod
     def init_rsu_status_list():

@@ -28,7 +28,7 @@ def create_db_session(sqlite_dir=CommonConf.SQLITE_DIR, sqlite_database='etc_ded
     #     pool_size=5,  # 连接池大小
     #     )
     sqlite_path = os.path.join(sqlite_dir, sqlite_database)
-    engine = create_engine('sqlite:///' + sqlite_path)
+    engine = create_engine('sqlite:///' + sqlite_path, connect_args={'check_same_thread': False})
     db_session = sessionmaker(bind=engine)()
     return engine, db_session
 
@@ -59,10 +59,10 @@ class DBClient(object):
         try:
             db_session.add(orm)
             db_session.commit()
-            logger.info('数据入库成功')
         except:
             db_session.rollback()
             logger.error(traceback.format_exc())
+            logger.info('数据入库失败')
 
     @staticmethod
     def exists_in_blacklist(card_net, card_id):

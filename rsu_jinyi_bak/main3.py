@@ -1,14 +1,15 @@
+"""
+使用flask框架
+"""
 import multiprocessing
 import time
 
-import uvicorn
 import os
 import traceback
 from apscheduler.executors.pool import ProcessPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
-
+from flask_pydantic import validate
 from common.config import CommonConf
 from common.log import logger
 from model.db_orm import init_db, clear_table
@@ -18,31 +19,14 @@ from service.db_operation import DBOPeration
 from service.rsu_store import RsuStore
 from service.third_etc_api import ThirdEtcApi
 
-app = FastAPI()
-
-# scheduler = AsyncIOScheduler()
-scheduler = BackgroundScheduler()
+from flask import Flask
 
 
-@app.on_event('startup')
-def create_sqlite():
-    """数据库初始化"""
-    init_db()
-    # 清空表 rsu_info
-    clear_table()
-
-
-@app.on_event("startup")
-def init_rsu_store_dict():
-    """
-    初始化天线配置
-    """
-    RsuStore.init_rsu_store()
-
-
-@app.on_event('startup')
 def init_scheduler():
     """初始化调度器"""
+    # scheduler = AsyncIOScheduler()
+    scheduler = BackgroundScheduler()
+
     job_sqlite_path = os.path.join(CommonConf.SQLITE_DIR, 'jobs.sqlite')
     # 每次启动任务时删除数据库
     os.remove(job_sqlite_path) if os.path.exists(job_sqlite_path) else None
@@ -69,24 +53,30 @@ def init_scheduler():
 
     scheduler.start()
 
+def create_app():
+    logger.info('======================创建app=======================')
+    # 创建app
+    app = Flask(__name__)
+    return app
 
-@app.on_event("shutdown")
-def shutdown():
-    logger.info('application shutdown')
 
+app = create_app()
 
-@app.post("/etc_fee_deduction")
+@app.route("/etc_fee_deduction", methods=['POST'])
+@validate()
 def etc_fee_deduction(body: OBUModel):
     """
     etc扣费
     :param body:
     :return:
     """
+    print(body)
+    print('11111111111111111111111')
 
     body.recv_time = time.time()
     try:
-        logger.info('=====================接收到扣费请求=====================')
         DBOPeration.etc_request_info_to_db(body)
+        logger.info('time use: {}'.format(time.time() - body.recv_time))
         result = dict(flag=True,
                       errorCode='',
                       errorMessage='',
@@ -101,12 +91,26 @@ def etc_fee_deduction(body: OBUModel):
     return result
 
 
-@app.get('/')
+@app.route('/', methods=['GET'])
 def head():
     return dict(hello='world')
 
 
+def startup_task():
+    """
+    程序启动时创建初始化任务
+    """
+    # 数据库初始化
+    init_db()
+    # 清空表 rsu_info
+    clear_table()
+    # 初始化天线配置
+    RsuStore.init_rsu_store()
+    # 开启定时任务
+    init_scheduler()
+
+
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    # TODO workers>1时有问题，考虑gunicorn+uvicorn，同时考虑多进程的定时任务问题
-    uvicorn.run(app="main:app", host="0.0.0.0", port=8001)
+    startup_task()
+    app.run(host='127.0.0.1', port=8001, debug=False)

@@ -53,7 +53,7 @@ class CommonConf(object):
     # etc检测心跳超时时间
     ETC_HEARTBEAT_TIME_OUT = ETC_CONF_DICT['etc_heartbeat_time_out']
     # sqlite的路径
-    SQLITE_DIR = ETC_CONF_DICT['sqlite_dir']
+    SQLITE_DIR = os.path.join(ROOT_DIR, 'sqlite_db')
     # RSU状态列表
     RSU_STATUS_LIST = []
     # 天线RsuSocket存储字典

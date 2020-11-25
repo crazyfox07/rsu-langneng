@@ -7,9 +7,9 @@ block_cipher = None
 
 
 a = Analysis(['main.py'],
-             pathex=['E:\\lxw\\project\\rsu-langneng\\rsu_jinyi'],
+             pathex=[],
              binaries=[],
-             datas=[('./common/etc_conf.yaml', './common'), ('./deploy', 'deploy')],
+             datas=[('./common/etc_conf.yaml', './common'), ('./deploy', 'deploy'), ('./sqlite_db', './sqlite_db')],
              hiddenimports= ['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols',
                              'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets',
                              'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'main'],

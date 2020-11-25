@@ -19,7 +19,7 @@ from common.config import CommonConf, StatusFlagConfig
 from common.db_client import DBClient, create_db_session
 from common.log import logger
 from common.utils import CommonUtil
-from model.db_orm import ETCFeeDeductInfoOrm
+from model.db_orm import ETCFeeDeductInfoOrm, ETCRequestInfoOrm
 from model.obu_model import OBUModel
 from service.command_receive_set import CommandReceiveSet
 from service.command_send_set import CommandSendSet
@@ -32,12 +32,12 @@ class RsuSocket(object):
     """
 
     def __init__(self, lane_num):
+        # 车道号
+        self.lane_num = lane_num
         # 天线状态, 默认有故障
         self.rsu_status = StatusFlagConfig.RSU_FAILURE
         # 天线开关状态
         self.rsu_on_or_off = StatusFlagConfig.RSU_ON
-        # 天线状态监控flag
-        self.monitor_rsu_status_on = True
         # 天线心跳的最新时间
         self.rsu_heartbeat_time = datetime.datetime.now()
         # 检测到obu的最新时间
@@ -67,8 +67,8 @@ class RsuSocket(object):
         """
         # 天线开关开启
         self.rsu_on_or_off = StatusFlagConfig.RSU_ON
-        if 'socket_client' in dir(self):
-            del self.socket_client
+        # if 'socket_client' in dir(self):
+        #     del self.socket_client
         t1 = time.time()
         logger.info('=============================天线初始化=============================')
         # 设置连接超时
@@ -118,78 +118,19 @@ class RsuSocket(object):
         t3 = time.time()
         logger.info('打开天线用时： {}s'.format(t3 - t1))
 
-
-
-    @func_set_timeout(CommonConf.ETC_HEARTBEAT_TIME_OUT)
-    def etc_heart_recv(self):
-        """
-        心跳检测超时时间
-        :return:
-        """
-        msg_bytes = self.socket_client.recv(1024)
-        return msg_bytes
-
-    def monitor_rsu_status(self, thread_name):
-        """
-        监听天线状态
-        :return:
-        """
-        print("=====================================" + thread_name + '=============================================')
-        # # 做创建一个客户端的socket对象，用于监听天线心跳
-        # monitor_socket_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # monitor_socket_client.bind(('127.0.0.1', 12345))
-        # # 连接服务端
-        # monitor_socket_client.connect((self.rsu_conf['ip'], self.rsu_conf['port']))
-        while True:
-            if self.rsu_on_or_off == StatusFlagConfig.RSU_OFF:
-                logger.info('###########当前天线处于休眠状态###########')
-                time.sleep(60)
-                continue
-            else:
-                logger.info('###########当前天线处于工作状态###########')
-            if self.monitor_rsu_status_on is True:
-                try:
-                    msg_bytes = self.etc_heart_recv()
-                except:
-                    error_msg = traceback.format_exc()
-                    logger.error('接收心跳数据超时：{}'.format(error_msg))
-                    if error_msg.find('在一个非套接字上尝试了一个操作') != -1:
-                        if self.rsu_on_or_off == StatusFlagConfig.RSU_OFF:
-                            logger.info('当前天线处于休眠状态')
-                        else:
-                            logger.error('!!!!!!!!!!!!天线处于工作状态时出现问题!!!!!!!!!!!!')
-                            del self.socket_client
-                            self.init_rsu()
-                        time.sleep(60)
-                        continue
-
-                msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
-                logger.info('接收天线指令：{}'.format(msg_str))
-                if msg_str[8: 12] == 'b200':
-                    # 更新心跳时间
-                    self.rsu_heartbeat_time = datetime.datetime.now()
-                    logger.info(thread_name + ': 心跳： {}'.format(msg_str))
-                elif msg_str[8:10] == 'b4':
-                    logger.info('{}: 检测到obu，还没有开始扣费： {}'.format(thread_name, msg_str))
-                    time.sleep(0.3)
-                    # 更新心跳时间
-                    self.rsu_heartbeat_time = datetime.datetime.now()
-                    self.detect_obu_time_latest = time.time()
-                else:
-                    logger.info(thread_name + '有待处理的指令： {}'.format(msg_str))
-            else:
-                logger.info('正在扣费，停止天线心跳检测')
-                time.sleep(3)
-                # 可能由于退出异常导致elf.monitor_rsu_status_on一直为False
-                self.monitor_rsu_status_on = True
-
     @func_set_timeout(CommonConf.FUNC_TIME_OUT - 2)
     def recv_msg(self):
         # 接收数据
         msg_bytes = self.socket_client.recv(1024)
         return msg_bytes
 
-    def fee_deduction(self, obu_body: OBUModel):
+    @func_set_timeout(20)
+    def recv_msg_max_wait_time(self):
+        # 接收数据
+        msg_bytes = self.socket_client.recv(1024).hex().replace('fe01', 'ff').replace('fe00', 'fe')
+        return msg_bytes
+
+    def fee_deduction(self, obu_body: ETCRequestInfoOrm):
         """
         etc扣费, 正常扣费指令流程, 耗时大约700ms  c0->b0->b2->c1->b3->c1->b4->c6->b5，其中
         c0: 发送初始化指令  --> init_rsu()中已经初始化
@@ -203,13 +144,11 @@ class RsuSocket(object):
         b5: 接收交易信息帧，表示此次交易成功结束
         :return:
         """
-        self.monitor_rsu_status_on = False  # 关闭心跳检测
         current_time = time.time()
         logger.info('==========================================开始扣费==========================================')
         logger.info('订单号：{}， 车牌号：{}， 车牌颜色：{}'.format(
             obu_body.trans_order_no, obu_body.plate_no, obu_body.plate_color_code))
         logger.info('最新obu检查时间差：{}'.format(current_time - self.detect_obu_time_latest))
-        self.monitor_rsu_status_on = False  # 关闭心跳检测
         # self.etc_charge_flag=True表示交易成功，self.etc_charge_flag=False表示交易失败
         self.etc_charge_flag = False
         obuid = None
@@ -219,9 +158,14 @@ class RsuSocket(object):
 
         while True:
             # 接收数据
-            msg_bytes = self.socket_client.recv(512)
-            msg_str = msg_bytes.hex()  # 字节转十六进制
-
+            try:
+                msg_bytes = self.recv_msg()
+            except:
+                logger.error('搜索obu超时')
+                result['error_msg'] = '没有搜索到obu'
+                return result
+            # 指令转义
+            msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
             if msg_str[8:10] == 'b2':
                 logger.info('接收b2心跳数据：{}'.format(msg_str))
                 if msg_str[10:12] == '00':
@@ -312,7 +256,7 @@ class RsuSocket(object):
             logger.error(error_msg)
         return card_sn_in_blacklist_flag, error_msg
 
-    def handle_data(self, body: OBUModel):
+    def handle_data(self, body: ETCRequestInfoOrm):
         """
         处理self.command_recv_set，也就是收到的天线的信息
         :param body: 接收到的数据
@@ -323,7 +267,7 @@ class RsuSocket(object):
                       data=None,
                       error_msg=None)
         # TODO 待待删打印信息
-        self.command_recv_set.print_obu_info()
+        # self.command_recv_set.print_obu_info()
         #  判断card_net和card_sn 物理卡号是否存在于黑名单中
         card_sn_in_blacklist_flag, error_msg = self.card_sn_in_blacklist()
         # 物理卡号存在于黑名单中直接返回
@@ -347,11 +291,14 @@ class RsuSocket(object):
         else:
             deduct_amount = body.deduct_amount
 
-        card_net_no=self.command_recv_set.info_b4['CardNetNo'],  # 网络编号
+        card_net_no = self.command_recv_set.info_b4['CardNetNo']  # 网络编号
         # ETC 卡片类型 16 储值卡  17 记账卡，转换成十进制分别对应22,23
         card_type = str(int(self.command_recv_set.info_b4['CardType'], 16))
         # PSAM 卡编号 10字节
-        psam_id = self.command_recv_set.info_ba['PsamSN']
+        try:
+            psam_id = self.command_recv_set.info_ba['PsamSN']
+        except:
+            print(self.command_recv_set.info_ba)
         #  card_sn 物理卡号 8字节
         card_sn = psam_id[4:]
         # TODO 待确认

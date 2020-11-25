@@ -7,7 +7,7 @@
 """
 import traceback
 from datetime import datetime
-from sqlalchemy import Column, String, SmallInteger, DateTime, Integer, Float
+from sqlalchemy import Column, String, SmallInteger, DateTime, Integer, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 from common.config import CommonConf
@@ -53,6 +53,7 @@ class RSUInfoOrm(Base):
     id = Column('id', String(32), primary_key=True)
     lane_num = Column('lane_num', String(16))
     park_code = Column('park_code', String(16))
+    sn = Column('sn', String(32))
     heartbeat_latest = Column('heartbeat_latest', DateTime)  # 天线的最新心跳时间
 
 
@@ -94,6 +95,7 @@ def delete_table_all():
 if __name__ == '__main__':
     # import json
     init_db()
+    clear_table()
     # data = {
     #     "lane_num": "1",  # chedaohao
     #     "trans_order_no": "7861300266476411030",

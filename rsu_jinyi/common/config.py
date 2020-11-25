@@ -53,7 +53,7 @@ class CommonConf(object):
     # etc检测心跳超时时间
     ETC_HEARTBEAT_TIME_OUT = ETC_CONF_DICT['etc_heartbeat_time_out']
     # sqlite的路径
-    SQLITE_DIR = os.path.join(ROOT_DIR, 'sqlite_db')
+    SQLITE_DIR = os.path.join(ROOT_DIR, 'sqlite_db')  # ETC_CONF_DICT['sqlite_dir']
     # RSU状态列表
     RSU_STATUS_LIST = []
     # 天线RsuSocket存储字典
@@ -62,6 +62,8 @@ class CommonConf(object):
     EXECUTOR = ThreadPoolExecutor(max_workers=3)
     # wait_time_between_command
     OBU_COMMAND_WAIT_TIME = ETC_CONF_DICT['obu']['wait_time_between_command']
+    # 当前天线的进程
+    RSU_PROCESS = None
 
 
 class StatusFlagConfig(Enum):

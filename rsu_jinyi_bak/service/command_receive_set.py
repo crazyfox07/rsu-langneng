@@ -181,8 +181,6 @@ class CommandReceiveSet(object):
         self.info_b2.clear()
         self.info_b4.clear()
         self.info_b5.clear()
-        self.info_ba.clear()
-        self.info_bb.clear()
 
 
 if __name__ == '__main__':
