@@ -56,6 +56,16 @@ class RSUInfoOrm(Base):
     heartbeat_latest = Column('heartbeat_latest', DateTime)  # 天线的最新心跳时间
 
 
+class RsuChargeOnOffOrm(Base):
+    """
+    开启或关闭天线收费
+    """
+    __tablename__ = 'rsu_charge_on_off'
+    id = Column('id', String(32), primary_key=True)
+    charge = Column('charge', SmallInteger, default=1)  # 1表示计费， 0表示不计费
+    update_time = Column('update_time', DateTime)
+
+
 def init_db():
     """初始化表"""
     Base.metadata.create_all(db_engine)

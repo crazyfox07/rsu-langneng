@@ -8,7 +8,7 @@ etc:
     trans_mode: '01'  # 交易模式
     wait_time: '02'  # 最小重读时间
     pll_channel_id: '00'  # 信道号
-    tx_power: 2  # 天线功率，十进制
+    tx_power: 1  # 天线功率，十进制
     obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
     device_no: "lanneng - 3202001001"# 设备号 32位
     device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
