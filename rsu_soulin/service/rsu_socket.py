@@ -191,7 +191,7 @@ class RsuSocket(object):
                     # 车牌颜色
                     obu_plate_color = str(
                         int(self.command_recv_set.info_b3['VehicleLicencePlateColor'], 16))  # obu车颜色
-                    if (obu_body.plate_no != plate_no) or (obu_body.plate_color_code != obu_plate_color):
+                    if (obu_body.plate_no != plate_no) or (int(obu_body.plate_color_code) != int(obu_plate_color)):
                         error_msg = "车牌号或车颜色不匹配： 监控获取的车牌号：%s, 车颜色：%s; obu获取的车牌号：%s,车颜色：%s" % (
                             obu_body.plate_no, obu_body.plate_color_code, plate_no, obu_plate_color)
                         logger.error(error_msg)

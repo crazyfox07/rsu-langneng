@@ -6,6 +6,7 @@
 @time:2020/11/12
 """
 import traceback
+from concurrent.futures.process import ProcessPoolExecutor
 
 from common.config import CommonConf
 from common.db_client import create_db_session
@@ -33,21 +34,30 @@ def clear_table_rsu_info():
         db_session.close()
 
 
-def run_etc_toll():
-    logger.info('。。。。。。。。。。。。。。。。。。。启动天线。。。。。。。。。。。。。。。。。。。。。。。。')
-    # 先清空etc_deduct.sqlite的表rsu_info
-    clear_table_rsu_info()
+def single_process_etc_toll(etc_conf):
     # 根据车道选择天线
-    rsu0_config = CommonConf.ETC_CONF_DICT['etc'][0]
-    lane_num = rsu0_config['lane_num']
-    park_code = rsu0_config['park_code']
-    sn = rsu0_config['sn']
+    # rsu0_config = etc_conf[0]
+    lane_num = etc_conf['lane_num']
+    park_code = etc_conf['park_code']
+    sn = etc_conf['sn']
     # 添加天线的lane_num, park_code, heartbeat_latest到etc_deduct.sqlite的表rsu_info中
     DBOPeration.rsu_info_to_db(lane_num, park_code, sn)
     # 创建天线对象
     rsu_socket = RsuSocket(lane_num)
     # 进入到扣费监听状态
     EtcToll.etc_toll(rsu_socket)
+
+
+def run_etc_toll():
+    logger.info('。。。。。。。。。。。。。。。。。。。启动天线。。。。。。。。。。。。。。。。。。。。。。。。')
+    # 先清空etc_deduct.sqlite的表rsu_info
+    clear_table_rsu_info()
+
+    executor = ProcessPoolExecutor(max_workers=len(CommonConf.ETC_CONF_DICT['etc']))
+    # etc_conf = CommonConf.ETC_CONF_DICT['etc'][0]
+    # single_process_etc_toll(etc_conf)
+    for etc_conf in CommonConf.ETC_CONF_DICT['etc']:
+        executor.submit(single_process_etc_toll, etc_conf)
 
 
 if __name__ == '__main__':
