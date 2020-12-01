@@ -52,12 +52,15 @@ def run_etc_toll():
     logger.info('。。。。。。。。。。。。。。。。。。。启动天线。。。。。。。。。。。。。。。。。。。。。。。。')
     # 先清空etc_deduct.sqlite的表rsu_info
     clear_table_rsu_info()
+    if CommonConf.PROCESS_EXECUTOR:
+        CommonConf.PROCESS_EXECUTOR.shutdown()
+        CommonConf.PROCESS_EXECUTOR = None
 
-    executor = ProcessPoolExecutor(max_workers=len(CommonConf.ETC_CONF_DICT['etc']))
+    CommonConf.PROCESS_EXECUTOR = ProcessPoolExecutor(max_workers=len(CommonConf.ETC_CONF_DICT['etc']))
     # etc_conf = CommonConf.ETC_CONF_DICT['etc'][0]
     # single_process_etc_toll(etc_conf)
     for etc_conf in CommonConf.ETC_CONF_DICT['etc']:
-        executor.submit(single_process_etc_toll, etc_conf)
+        CommonConf.PROCESS_EXECUTOR.submit(single_process_etc_toll, etc_conf)
 
 
 if __name__ == '__main__':

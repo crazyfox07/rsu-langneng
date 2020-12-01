@@ -65,6 +65,7 @@ from service.rsu_socket import RsuSocket
     #         logger.info('lane_num: {}， 心跳正常，数据库中最新心跳时间: {}， 对象的最新心跳时间： {}'.format(
     #             rsu_client.lane_num, rsu_info.heartbeat_latest, rsu_client.rsu_heartbeat_time))
     #     db_session.close()
+from service.wuganzhifu import WuGan
 
 
 class EtcToll(object):
@@ -81,21 +82,21 @@ class EtcToll(object):
                 time.sleep(30)
                 continue
 
-            if 0 <= now.hour <= 4:  # 0:00-5:00和22:00-24:00关闭天线
-                if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
-                    logger.info('-------------关闭天线---------------')
-                    rsu_client.close_socket()
-                    rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_OFF
-
-                rsu_client.rsu_heartbeat_time = now  # 更新心跳
-                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
-                time.sleep(60)
-                logger.info('。。。当前天线处于休眠状态。。。')
-                continue
-            elif rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:   # 其它时间段打开天线
-                logger.info('-------------打开天线---------------')
-                rsu_client.init_rsu()
-                rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_ON
+            # if 0 <= now.hour <= 4:  # 0:00-5:00和22:00-24:00关闭天线
+            #     if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
+            #         logger.info('-------------关闭天线---------------')
+            #         rsu_client.close_socket()
+            #         rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_OFF
+            #
+            #     rsu_client.rsu_heartbeat_time = now  # 更新心跳
+            #     DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+            #     time.sleep(60)
+            #     logger.info('。。。当前天线处于休眠状态。。。')
+            #     continue
+            # elif rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_OFF:   # 其它时间段打开天线
+            #     logger.info('-------------打开天线---------------')
+            #     rsu_client.init_rsu()
+            #     rsu_client.rsu_on_or_off = StatusFlagConfig.RSU_ON
 
             # socket监听，接受数据
             try:
@@ -167,8 +168,22 @@ class EtcToll(object):
         try:
             # etc开始扣费，并解析天线返回的数据
             msg = rsu_client.fee_deduction(body)
-            # 如果扣费失败
-            if msg['flag'] is False:
+            # 如果扣费失败，同时无感支付开启，并且是白名单，开启无感支付
+            if (msg['flag'] is False) and (CommonConf.ETC_CONF_DICT['wugan'] == 'true') and (body.is_white == 1):
+                device_no = CommonConf.ETC_CONF_DICT['dev_code']
+                deduct_amount = CommonUtil.yuan_to_fen(body.deduct_amount)
+                park_code = CommonConf.ETC_CONF_DICT['etc'][0]['park_code']
+                code, message = WuGan.upload_wugan(body.trans_order_no, park_code, body.plate_no,
+                                                   body.plate_color_code, body.plate_type_code, body.entrance_time,
+                                                   body.park_record_time, body.exit_time, device_no, deduct_amount)
+                if code == '000000':
+                    WuGan.notify_taigan(body)
+                    result['flag'] = True
+                    result['errorMessage'] = None
+                else:
+                    result['errorCode'] = code
+                    result['errorMessage'] = message
+            elif msg['flag'] is False:
                 result['errorMessage'] = msg['error_msg']
             else:  # 表示交易成功
                 # etc扣费成功后做进一步数据解析

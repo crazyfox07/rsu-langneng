@@ -13,6 +13,7 @@ from common.utils import CommonUtil
 from model.db_orm import ETCRequestInfoOrm, RSUInfoOrm
 from model.obu_model import OBUModel
 from service.rsu_socket import RsuSocket
+from service.wuganzhifu import WuGan
 
 
 class DBOPeration(object):
@@ -21,6 +22,11 @@ class DBOPeration(object):
         """
         请求体body入库
         """
+        if CommonConf.ETC_CONF_DICT['wugan'] == 'true':
+            is_white = WuGan.is_white(park_code=CommonConf.ETC_CONF_DICT['etc'][0]['park_code'], plate_no=body.plate_no, plate_color_code=body.plate_color_code)
+            is_white = 1 if is_white else 0
+        else:
+            is_white = 0
         db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                                   sqlite_database='etc_deduct.sqlite')
         # etc_deduct_info_json入库
@@ -38,6 +44,7 @@ class DBOPeration(object):
                                            deduct_amount=body.deduct_amount,
                                            receivable_total_amount=body.receivable_total_amount,
                                            discount_amount=body.discount_amount,
+                                           is_white=is_white,
                                            flag=0,
                                            ))
         db_session.close()

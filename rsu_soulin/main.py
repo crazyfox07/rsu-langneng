@@ -76,7 +76,7 @@ def init_scheduler():
     scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1',
                       id='reupload_etc_deduct_from_db')
     # 检测天线心跳状态， 心跳停止过长，重启天线
-    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1', id='check_rsu_heartbeat',
+    scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/3', id='check_rsu_heartbeat',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
     scheduler.add_listener(my_listener, events.EVENT_JOB_EXECUTED | events.EVENT_JOB_ERROR)
     logger.info("启动调度器...")

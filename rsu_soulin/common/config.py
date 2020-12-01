@@ -64,6 +64,8 @@ class CommonConf(object):
     OBU_COMMAND_WAIT_TIME = ETC_CONF_DICT['obu']['wait_time_between_command']
     # 当前天线的进程
     RSU_PROCESS = None
+    #进程池
+    PROCESS_EXECUTOR = None
 
 
 class StatusFlagConfig(Enum):
@@ -85,3 +87,4 @@ os.makedirs(CommonConf.SQLITE_DIR, exist_ok=True)
 
 if __name__ == '__main__':
     print(CommonConf.SOCKET_TIME_OUT)
+    print(CommonConf.ETC_CONF_DICT['etc'][0]['park_code'])

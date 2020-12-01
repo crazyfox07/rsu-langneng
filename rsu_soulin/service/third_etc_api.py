@@ -246,6 +246,7 @@ class ThirdEtcApi(object):
         try:
             res = http_session.post(etc_deduct_notify_url, json=etc_deduct_notify_data)
             result = res.json()['result']
+            logger.info('抬杆状态： {}'.format(result))
             if result == 'success':
                 return True
         except:
