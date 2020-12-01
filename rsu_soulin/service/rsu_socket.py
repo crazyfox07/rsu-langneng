@@ -143,7 +143,7 @@ class RsuSocket(object):
         result = dict(flag=False,
                       data=None,
                       error_msg=None)
-        # 统计扣费期间b2的数量，有时会遇到b2->c1-b2->c1->b2->c1这样的无线循环
+        # 统计扣费期间b2的数量，有时会遇到b2->c1-b2->c1->b2->c1这样的无限循环
         count_b2 = 0
         # 设置超时时间
         while True:
