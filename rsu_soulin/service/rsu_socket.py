@@ -143,6 +143,8 @@ class RsuSocket(object):
         result = dict(flag=False,
                       data=None,
                       error_msg=None)
+        # 统计扣费期间b2的数量，有时会遇到b2->c1-b2->c1->b2->c1这样的无线循环
+        count_b2 = 0
         # 设置超时时间
         while True:
             # 接收数据
@@ -174,6 +176,10 @@ class RsuSocket(object):
                     c1 = CommandSendSet.combine_c1(obuid, obu_div_factor=self.rsu_conf['obu_div_factor'])
                     logger.info('b2后发送c1指令：%s' % (c1))
                     self.socket_client.send(bytes.fromhex(c1))
+                    count_b2 += 1
+                    if count_b2 > 3:
+                        result['error_msg'] = '无法扣费，陷入b2->c1-b2->c1->b2->c1循环'
+                        return result
                 else:
                     result['error_msg'] = 'obu卡有问题，obu状态码： {}'.format(msg_str[68:72])
                     return result

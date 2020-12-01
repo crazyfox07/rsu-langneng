@@ -15,6 +15,20 @@ etc:
     device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
     sn: 'soulin-311-2006-005'  # 天线sn编号
 
+  - lane_num: '4028818a76020217017607be6afc0003'   # 车道号 出口2
+    park_code: '371109'  # 停车场编号
+    ip: '192.168.70.44'  # 天线ip
+    port: 60001   # 天线端口
+    lane_mode: '04'   # 车道工作模式
+    trans_mode: '01'  # 交易模式
+    wait_time: '02'  # 最小重读时间
+    pll_channel_id: '00'  # 信道号
+    tx_power: 20  # 天线功率，十进制
+    obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
+    device_no: "lanneng - 3202001004"# 设备号 32位
+    device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
+    sn: 'soulin-311-2006-016'  # 天线sn编号
+
 # 目前还没有用到mysql数据库
 #mysql:
 #  host: '192.168.1.100'
