@@ -94,7 +94,7 @@ def etc_fee_deduction(body: OBUModel):
 
     body.recv_time = time.time()
     try:
-        logger.info('=====================接收到扣费请求=====================')
+        logger.info('=====================lane_num: {}  接收到扣费请求====================='.format(body.lane_num))
         DBOPeration.etc_request_info_to_db(body)
         result = dict(flag=True,
                       errorCode='',

@@ -54,7 +54,8 @@ class RsuStatus(object):
             rsu_pids.append(rsu_infor_orm.pid)
             time_diff_seconds = (now - rsu_infor_orm.heartbeat_latest).seconds
             # 如果三分钟没有心跳，需要重启etc扣费
-            if time_diff_seconds >= CommonConf.ETC_HEARTBEAT_TIME_OUT or rsu_infor_orm.status == 0:
+            # if time_diff_seconds >= CommonConf.ETC_HEARTBEAT_TIME_OUT or rsu_infor_orm.status == 0:
+            if rsu_infor_orm.status == 0:
                 logger.error('park_code: {}, lane_num: {} 的最新心跳时间： {}，距离当前已过：{}s'.format(
                     rsu_infor_orm.park_code,
                     rsu_infor_orm.lane_num,
