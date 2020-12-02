@@ -6,6 +6,7 @@
 @time:2020/11/12
 """
 import traceback
+import os
 from concurrent.futures.process import ProcessPoolExecutor
 
 from common.config import CommonConf
@@ -19,7 +20,7 @@ from service.rsu_socket import RsuSocket
 
 def clear_table_rsu_info():
     """
-    清空天线信息列表
+    清空天线信息列表, 监控进程表
     @return:
     """
     _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
@@ -40,8 +41,9 @@ def single_process_etc_toll(etc_conf):
     lane_num = etc_conf['lane_num']
     park_code = etc_conf['park_code']
     sn = etc_conf['sn']
-    # 添加天线的lane_num, park_code, heartbeat_latest到etc_deduct.sqlite的表rsu_info中
-    DBOPeration.rsu_info_to_db(lane_num, park_code, sn)
+    status = 1
+    # 添加天线的lane_num, park_code, heartbeat_latest,当前进程号pid，天线状态到etc_deduct.sqlite的表rsu_info中
+    DBOPeration.rsu_info_to_db(lane_num, park_code, sn, os.getpid(), status)
     # 创建天线对象
     rsu_socket = RsuSocket(lane_num)
     # 进入到扣费监听状态

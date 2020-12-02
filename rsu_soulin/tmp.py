@@ -5,98 +5,80 @@
 @file:tmp.py
 @time:2020/11/16
 """
-import multiprocessing
 import os
+import signal
 import time
-from multiprocessing.context import Process
-
-import uvicorn
-from apscheduler import events
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.executors.pool import ProcessPoolExecutor
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
-
-from common.log import logger
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 
-app = FastAPI()
 
-# scheduler = AsyncIOScheduler()
-# scheduler = BlockingScheduler()
-scheduler = BackgroundScheduler()
+def now():
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(time.time())))
 
 
-def func3():
-    i = 10
+def kill_process_by_pid(pid):
+    print('**********************************************************')
+    print('kill pid: {}'.format(pid))
+    os.kill(pid)
+
+
+def func1(i, p1):
+    count = 0
+    print('{}: func1'.format(i))
     while True:
-        logger.info('5555555555555')
-        1 / i
-        i = i - 1
         time.sleep(2)
+        print('time: {}, process: {}, pid: {}'.format(now(), i, os.getpid()))
+        data = dict(process_no=i,
+                    pid = os.getpid())
+        p1.send(data)
+        count += 1
+        if count > 3 and i == 0:
+            pid = os.getpid()
+            kill_process_by_pid(pid)
 
 
-def func2():
-    logger.info('33333333333')
-    Process(target=func3).start()
-    logger.info('44444444444444')
 
 
+def func2(i, p0):
+    count = 0
+    print('{}: func2'.format(i))
+    while True:
+        # time.sleep(2)
+        data = p0.recv()
+        process_no, pid = data['process_no'], data['pid']
+        print('recv : process_no: {}, pid: {}'.format(process_no, pid))
+        # if process_no == 0 and count > 5:
+        #     print('结束进程： process_no: {}, pid: {}'.format(process_no, pid))
+        #     kill_process_by_pid(pid)
+        #
+        # count += 1
 
-
-def func1():
-    logger.info('11111111111')
-    time.sleep(3)
-    a = 1 / 0
-    logger.info('22222222222')
-
-
-@app.on_event('startup')
-def run():
-    func2()
-    def my_listener(event):
-        """事件监听"""
-        if event.exception:
-            logger.exception('========== The job crashed :( ==========')
-            logger.exception(str(event.exception))
-        else:
-            logger.info('============ The job worked :) ===========')
-
-    job_sqlite_path = os.path.join('sqlite_db', 'jobs.sqlite')
-    # 每次启动任务时删除数据库
-    os.remove(job_sqlite_path) if os.path.exists(job_sqlite_path) else None
-    jobstores = {
-        'default': SQLAlchemyJobStore(url='sqlite:///' + job_sqlite_path)  # SQLAlchemyJobStore指定存储链接
-    }
-    executors = {
-        'default': {'type': 'threadpool', 'max_workers': 10},  # 最大工作线程数20
-        'processpool': ProcessPoolExecutor(max_workers=3)  # 最大工作进程数为5
-    }
-
-    job_defaults = {
-        'coalesce': False,
-        'max_instances': 3
-    }
-
-    scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
-
-    # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
-    # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
-
-    # scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
-    scheduler.add_job(func1, trigger='cron', second='*/5', id='func1')
-
-    scheduler.add_listener(my_listener, events.EVENT_JOB_EXECUTED | events.EVENT_JOB_ERROR)
-
-
-    logger.info("启动调度器...")
-
-    scheduler.start()
+        # print('time: {}, process: {}, pid: {}, ppid: {}'.format(now(), i, os.getpid(), os.getppid()))
+        # count += 1
+        # if count > 5:
+        #     print('结束进程： {}'.format(i))
+        #     os._exit(0)
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
-    # TODO workers>1时有问题，考虑gunicorn+uvicorn，同时考虑多进程的定时任务问题
-    uvicorn.run(app="tmp:app", host="0.0.0.0", port=8001)
+    # 创建一个管道　这个管道是双向的
+    PIPE_SEND, PIPE_RECV = multiprocessing.Pipe()
+
+    works = 2
+    excutor = ProcessPoolExecutor(max_workers=works + 1)
+    for i in range(works):
+        excutor.submit(func1, i, PIPE_SEND)
+    excutor.submit(func2, 2, PIPE_RECV)
+
+    time.sleep(7)
+    print('=================================')
+    # print(queue.all)
+    # print(os.popen('tasklist').read())
+    # os.system('taskkill /IM chrome.exe /F')
+    # queue.put(dict(number=1, pid=os.getpid()))
+    # queue.put(dict(number=1, pid=os.getpid()))
+    # time.sleep(1)
+    # print(queue.qsize(), queue.)
+    # while not queue.empty():
+    #     print(queue.get())

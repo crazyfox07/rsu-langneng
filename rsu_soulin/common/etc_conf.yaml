@@ -37,7 +37,7 @@ etc:
 #  passworld: "aabbcc"
 #  db_name: "test01"
 
-sqlite_dir: 'D:\\rsucontroller\\dist\\main\\sqlite_db'
+#sqlite_dir: 'D:\\rsucontroller\\dist\\main\\sqlite_db'
 
 thirdApi:  # 第三方接口
   url: 'http://lnetc1.c2s.pub:6868/etc/api/gateway/etc'  # 'http://58.59.49.122:8810/api/gateway/etc' #
@@ -53,4 +53,4 @@ debug: 'false'  # debug位true模式下扣费一分
 func_time_out: 6  # 方法超时时间， 单位秒
 socket_time_out: 0.5 # socket连接超时设置， 单位秒
 detect_obu_time_latest_diff: 1  # 如果检测到obu的时间距离第三方调用etc接口扣费时间不超detect_obu_time_latest_diff秒,则启用etc扣费，否则禁用
-etc_heartbeat_time_out: 150 # 心跳超时时间，单位秒
+etc_heartbeat_time_out: 600 # 心跳超时时间，单位秒

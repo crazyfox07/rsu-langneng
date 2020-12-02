@@ -56,6 +56,9 @@ class RSUInfoOrm(Base):
     park_code = Column('park_code', String(16))
     sn = Column('sn', String(32))
     heartbeat_latest = Column('heartbeat_latest', DateTime)  # 天线的最新心跳时间
+    pid = Column('pid', Integer)  # 天线对应程序的进程号
+    status = Column('status', SmallInteger, default=1)  # 1 表示正常， 0表示天线状态异常
+    create_time = Column('create_time', DateTime, default=datetime.now)
 
 
 class RsuChargeOnOffOrm(Base):

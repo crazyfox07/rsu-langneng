@@ -108,6 +108,9 @@ class EtcToll(object):
                     time.sleep(30)
                 else:
                     time.sleep(10)
+                DBOPeration.update_rsu_pid_status(rsu_client, 0)
+                rsu_client.close_socket()
+                rsu_client.init_rsu()
                 continue
             # 有接收到数据，表明天线还在工作，更新心跳时间
             rsu_client.rsu_heartbeat_time = datetime.now()

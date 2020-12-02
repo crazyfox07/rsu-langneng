@@ -113,7 +113,7 @@ class RsuSocket(object):
         msg_bytes = self.socket_client.recv(1024)
         return msg_bytes
 
-    @func_set_timeout(100)
+    @func_set_timeout(130)
     def recv_msg_max_wait_time(self):
         # 接收数据
         msg_bytes = self.socket_client.recv(1024).hex().replace('fe01', 'ff').replace('fe00', 'fe')
@@ -392,15 +392,18 @@ class RsuSocket(object):
         关闭天线
         :return:
         """
-        # 天线开关关闭
-        self.rsu_on_or_off = StatusFlagConfig.RSU_OFF
-        # 关闭天线指令
-        c4 = CommandSendSet.combine_c4('00')
-        logger.info('关闭天线指令：%s' % (c4))
-        self.socket_client.send(bytes.fromhex(c4))
-        # 关闭socket
-        self.socket_client.shutdown(2)
-        self.socket_client.close()
+        try:
+            # 天线开关关闭
+            self.rsu_on_or_off = StatusFlagConfig.RSU_OFF
+            # 关闭天线指令
+            c4 = CommandSendSet.combine_c4('00')
+            logger.info('关闭天线指令：%s' % (c4))
+            self.socket_client.send(bytes.fromhex(c4))
+            # 关闭socket
+            self.socket_client.shutdown(2)
+            self.socket_client.close()
+        except:
+            logger.error(traceback.format_exc())
 
 
 if __name__ == '__main__':

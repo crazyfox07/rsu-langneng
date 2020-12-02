@@ -5,12 +5,21 @@ import random
 import string
 import zipfile
 import requests
+import signal
 
 from common.config import CommonConf
 from datetime import datetime
 
 
 class CommonUtil(object):
+    @staticmethod
+    def kill_process_by_pid(pids):
+        """
+        根据pid结束进程
+        """
+        for pid in pids:
+            os.kill(pid, signal.SIGTERM)
+
     @staticmethod
     def timestamp_format(timestamp=int(time.time()), format='%Y%m%d%H%M%S'):
         """
