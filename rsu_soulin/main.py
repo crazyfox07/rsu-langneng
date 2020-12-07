@@ -16,6 +16,7 @@ from model.db_orm import init_db, clear_table
 from model.obu_model import OBUModel
 from service.check_rsu_status import RsuStatus
 from service.db_operation import DBOPeration
+from service.etc_service import EtcService
 from service.third_etc_api import ThirdEtcApi
 
 app = FastAPI()
@@ -107,6 +108,16 @@ def etc_fee_deduction(body: OBUModel):
                       errorCode='01',
                       errorMessage='etc扣费失败',
                       data=None)
+    return result
+
+
+@app.get('/etc/deduct_status')
+def etc_deduct_status(order_id: str):
+    """
+    查询etc扣费状态
+    :param order_id: 订单号
+    """
+    result = EtcService.query_etc_deduct_status(order_id)
     return result
 
 

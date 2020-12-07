@@ -12,6 +12,7 @@ from common.db_client import create_db_session, DBClient
 from common.log import logger
 from common.utils import CommonUtil
 from model.db_orm import ETCRequestInfoOrm, RSUInfoOrm
+from model.etc_deduct_status import EtcDeductStatus
 from model.obu_model import OBUModel
 from service.rsu_socket import RsuSocket
 from service.wuganzhifu import WuGan
@@ -47,6 +48,7 @@ class DBOPeration(object):
                                            discount_amount=body.discount_amount,
                                            is_white=is_white,
                                            flag=0,
+                                           deduct_status=EtcDeductStatus.DEDUCTING,
                                            ))
         db_session.close()
         db_engine.dispose()

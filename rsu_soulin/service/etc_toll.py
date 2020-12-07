@@ -19,6 +19,7 @@ from common.db_client import create_db_session
 from common.log import logger
 from common.utils import CommonUtil
 from model.db_orm import ETCRequestInfoOrm
+from model.etc_deduct_status import EtcDeductStatus
 from service.db_operation import DBOPeration
 from service.db_rsu_charge import DBRsuCharge
 from service.rsu_socket import RsuSocket
@@ -131,25 +132,32 @@ class EtcToll(object):
                 and_(ETCRequestInfoOrm.lane_num == rsu_client.lane_num,
                      ETCRequestInfoOrm.create_time > (datetime.now() - timedelta(seconds=10)),
                      ETCRequestInfoOrm.flag == 0)).first()
+            # TODO  收到etc扣费请求，但是车上没有obu
             # 找到订单开始扣费
             if query_item:
                 logger.info('开始扣费。。。。。。')
                 logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
                 etc_result = EtcToll.toll(query_item, rsu_client)
                 query_item.flag = 1
+
+                if etc_result['flag']:
+                    logger.info('...................扣费成功........................')
+                    query_item.deduct_status = EtcDeductStatus.SUCCESS
+                else:
+                    logger.info('...................扣费失败........................')
+                    query_item.deduct_status = EtcDeductStatus.FAIL
                 # 数据修改好后提交
                 try:
                     db_session.commit()
                 except:
                     db_session.rollback()
                     logger.error(traceback.format_exc())
-                if etc_result['flag']:
-                    logger.info('...................扣费成功........................')
-                else:
-                    logger.info('...................扣费失败........................')
-            else:  # 没有查询到订单，pass
+
+            else:
+                # 没有查询到订单，pass
                 pass
             db_session.close()
+
 
     @staticmethod
     @func_set_timeout(CommonConf.FUNC_TIME_OUT)
