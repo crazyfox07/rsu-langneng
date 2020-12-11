@@ -7,6 +7,7 @@
 """
 import json
 import os
+import pickle
 import traceback
 
 from sqlalchemy import and_
@@ -71,6 +72,19 @@ class ThirdEtcApi(object):
             logger.error(traceback.format_exc())
         upload_fail_count = 0 if upload_flag else 1
         return upload_flag, upload_fail_count
+
+    @staticmethod
+    def exists_in_fxf_blacklist(card_net: str):
+        """
+        平台参数下载-发行方黑名单接口
+        """
+        with open(os.path.join(CommonConf.SQLITE_DIR, 'fxf_blacklist.pkl'), 'rb') as fr:
+            fxf_blacklist = pickle.load(fr)
+            for fxf_black_item in fxf_blacklist:
+                if card_net.startswith(fxf_black_item):
+                    logger.info('card_net:{} in blacklist {}'.format(card_net, ','.join(fxf_blacklist)))
+                    return True
+        return False
 
     @staticmethod
     def exists_in_blacklist(issuer_identifier, card_net, card_id):
@@ -246,24 +260,49 @@ class ThirdEtcApi(object):
         try:
             res = http_session.post(etc_deduct_notify_url, json=etc_deduct_notify_data)
             result = res.json()['result']
+            logger.info('抬杆状态： {}'.format(result))
             if result == 'success':
                 return True
         except:
             logger.error(traceback.format_exc())
         return False
 
+    @staticmethod
+    def download_fxf_blacklist():
+        """
+        发行方黑名单接口
+        """
+        params = {
+            "params_code": "1001",
+            "park_code": CommonConf.ETC_CONF_DICT['etc'][0]['park_code'],
+        }
+        data_dict = {
+            "method": "platformParams",
+            "params": params
+        }
+        data_json = json.dumps(data_dict, ensure_ascii=False)
+        logger.info('平台参数下载-发行方黑名单接口：{}'.format(data_json))
+        sign = XlapiSignature.to_sign_with_private_key(data_json, private_key=ThirdEtcApi.PRIVATE_KEY)
+        upload_body = dict(appid=ThirdEtcApi.APPID,
+                           data=data_json,
+                           sign=sign.decode(encoding='utf8'))
+        res_json = http_session.post(ThirdEtcApi.ETC_UPLOAD_URL, data=upload_body).json()
+        if res_json['code'] == '000000':
+            fxf_blacklist = res_json['data']['params_list']
+            print(fxf_blacklist)
+            with open(os.path.join(CommonConf.SQLITE_DIR, 'fxf_blacklist.pkl'), 'wb') as fw:
+                pickle.dump(fxf_blacklist, fw)
+
+
 
 if __name__ == '__main__':
-    print('start')
-    params={
-        "park_code": "371143",
-        "dev_code": "00000001",
-        "status_code": "11",
-        "rsu_broke_list": [],
-        "black_file_version": "0",
-        "black_file_version_incr": "0"
-    }
-    ThirdEtcApi.tianxian_heartbeat(params)
+    # print('start')
+    # params={
+    #     "params_code": "1001",
+    #     "park_code": "371104",
+    # }
+    # ThirdEtcApi.download_fxf_blacklist(params)
+    print(ThirdEtcApi.exists_in_fxf_blacklist('24221'))
     # ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
     # query_items = db_session.query(ETCFeeDeductInfoOrm).filter(
     #     and_(ETCFeeDeductInfoOrm.create_time > (datetime.now() - timedelta(seconds=3600)),

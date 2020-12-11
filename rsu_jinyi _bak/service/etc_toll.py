@@ -20,60 +20,23 @@ from common.utils import CommonUtil
 from model.db_orm import RSUInfoOrm, ETCRequestInfoOrm
 from model.obu_model import OBUModel
 from service.db_operation import DBOPeration
+from service.db_rsu_charge import DBRsuCharge
 from service.rsu_socket import RsuSocket
-
-
-class TimingJob(object):
-
-    @staticmethod
-    def start_scheduler(rsu_client: RsuSocket):
-        logger.info('++++++++++++++++++++++++++++++++++++++++++++++')
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(TimingJob.check_rsu_status, args=(rsu_client,), trigger='cron', minute='*/1')  # 每一分钟检查一次天线状态
-        logger.info('lane_num: {} 启动定时任务'.format(rsu_client.lane_num))
-        scheduler.start()
-
-    @staticmethod
-    def check_rsu_status(rsu_client):
-        """
-        检查天线状态，心跳时间过长重启天线
-        """
-        _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
-                                          sqlite_database='etc_deduct.sqlite')
-        rsu_info: RSUInfoOrm = db_session.query(RSUInfoOrm).filter(RSUInfoOrm.lane_num == rsu_client.lane_num).first()
-        # 如果三分钟内没有更新心跳，重启天线
-        if (datetime.now() - rsu_info.heartbeat_latest).seconds > 60 * 3:
-            rsu_client.rsu_status = StatusFlagConfig.RSU_FAILURE
-            logger.info('lane_num: {} 心跳不正常，数据库中最新心跳时间: {}， 对象的最新心跳时间： {}'.format(
-                rsu_client.lane_num, rsu_info.heartbeat_latest, rsu_client.rsu_heartbeat_time))
-            try:
-                rsu_client.init_rsu()
-            except:
-                logger.error(traceback.format_exc())
-            if rsu_client.rsu_status == StatusFlagConfig.RSU_FAILURE:
-                logger.info('**********重启天线失败**************')
-            else:
-                logger.info('**********重启天线成功**************')
-                rsu_info.heartbeat_latest = rsu_client.rsu_heartbeat_time
-                try:
-                    db_session.commit()
-                except:
-                    db_session.rollback()
-                    logger.error('重启天线后，更新数据库失败')
-        else:
-            logger.info('lane_num: {}， 心跳正常，数据库中最新心跳时间: {}， 对象的最新心跳时间： {}'.format(
-                rsu_client.lane_num, rsu_info.heartbeat_latest, rsu_client.rsu_heartbeat_time))
-        db_session.close()
 
 
 class EtcToll(object):
     @staticmethod
     def etc_toll(rsu_client: RsuSocket):
-        DBOPeration.rsu_info_to_db(rsu_client)
-        TimingJob.start_scheduler(rsu_client)
         while True:
             now = datetime.now()
-            if (24 > now.hour >= 22) or (0 <= now.hour < 5):  # 0:00-5:00和20:00-22:00关闭天线
+            # 查询天线的计费状态，charge=1开启计费，charge=0关闭计费
+            rsu_charge = DBRsuCharge.query_rsu_charge()
+            if rsu_charge == 0:
+                rsu_client.rsu_heartbeat_time = now  # 更新心跳
+                DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+                time.sleep(30)
+                continue
+            if 0 <= now.hour <= 4:  # 0:00-4:00
                 if rsu_client.rsu_on_or_off == StatusFlagConfig.RSU_ON:
                     logger.info('-------------关闭天线---------------')
                     rsu_client.close_socket()
@@ -127,9 +90,7 @@ class EtcToll(object):
             if query_item:
                 logger.info('开始扣费。。。。。。')
                 logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
-                logger.info('《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《《')
                 etc_result = EtcToll.toll(query_item, rsu_client)
-                logger.info('》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》》')
                 logger.info(json.dumps(etc_result, ensure_ascii=False))
                 query_item.flag = 1
                 # 数据修改好后提交

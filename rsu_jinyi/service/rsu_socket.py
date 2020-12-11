@@ -6,6 +6,7 @@
 @time: 2020/9/17 11:50
 """
 import json
+import os
 import threading
 import time
 import datetime
@@ -124,7 +125,7 @@ class RsuSocket(object):
         msg_bytes = self.socket_client.recv(1024)
         return msg_bytes
 
-    @func_set_timeout(20)
+    @func_set_timeout(60)
     def recv_msg_max_wait_time(self):
         # 接收数据
         msg_bytes = self.socket_client.recv(1024).hex().replace('fe01', 'ff').replace('fe00', 'fe')
@@ -237,6 +238,7 @@ class RsuSocket(object):
                 return result
             else:
                 logger.info('未能解析到的指令：{}'.format(msg_str))
+                time.sleep(1)
 
 
     def card_sn_in_blacklist(self):
@@ -246,6 +248,9 @@ class RsuSocket(object):
         """
         issuer_identifier = self.command_recv_set.info_b4['IssuerIdentifier']  # 发行商代码 8字节
         card_net = self.command_recv_set.info_b4['CardNetNo']    # 卡片网络编号，2字节
+        # 平台参数下载-发行方黑名单接口：针对某些card_net不进行etc
+        if ThirdEtcApi.exists_in_fxf_blacklist(card_net):
+            return True, 'card_net: {} in blacklist'.format(card_net)
         # TODO 待确认
         card_sn = self.command_recv_set.info_b4['UserCardNo']  # card id 8字节
         card_sn_in_blacklist_flag = ThirdEtcApi.exists_in_blacklist(

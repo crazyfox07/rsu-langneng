@@ -6,15 +6,12 @@ import json
 from fastapi import FastAPI
 
 from common.config import CommonConf
-from common.db_client import create_db_session, DBClient
 from common.http_client import http_session
 from common.log import logger
 from common.sign_verify import XlapiSignature
 from common.utils import CommonUtil
-from model.db_orm import ETCFeeDeductInfoOrm
 from model.obu_model import OBUModel
 from model.obu_model2 import OBUModel2
-from service.third_etc_api import ThirdEtcApi
 
 app = FastAPI()
 

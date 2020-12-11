@@ -237,6 +237,7 @@ class RsuSocket(object):
                 return result
             else:
                 logger.info('未能解析到的指令：{}'.format(msg_str))
+                time.sleep(1)
 
 
     def card_sn_in_blacklist(self):

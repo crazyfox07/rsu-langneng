@@ -267,7 +267,10 @@ class RsuSocket(object):
         :return:
         """
         issuer_info = self.command_recv_set.info_b4['IssuerInfo']
-        card_net = issuer_info[20: 24]  # 需要转换为整数
+        card_net = str(issuer_info[20: 24])
+        # 平台参数下载-发行方黑名单接口：针对某些card_net不进行etc
+        if ThirdEtcApi.exists_in_fxf_blacklist(card_net):
+            return True, 'card_net: {} in blacklist'.format(card_net)
         card_sn = issuer_info[24: 40]
         issuer_identifier = self.command_recv_set.info_b2['IssuerIdentifier']
         card_sn_in_blacklist_flag = ThirdEtcApi.exists_in_blacklist(

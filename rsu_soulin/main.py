@@ -79,6 +79,9 @@ def init_scheduler():
     # 检测天线心跳状态， 心跳停止过长，重启天线
     scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/3', id='check_rsu_heartbeat',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2)
+    # 平台参数下载-发行方黑名单接口
+    ThirdEtcApi.download_fxf_blacklist()  # 先立即执行一次
+    scheduler.add_job(ThirdEtcApi.download_fxf_blacklist, trigger='cron', hour='*/12', id='download_fxf_blacklist')
     scheduler.add_listener(my_listener, events.EVENT_JOB_EXECUTED | events.EVENT_JOB_ERROR)
     logger.info("启动调度器...")
 

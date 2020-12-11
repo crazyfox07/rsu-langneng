@@ -45,7 +45,7 @@ class DBOPeration(object):
 
 
     @staticmethod
-    def rsu_info_to_db(rsu_client: RsuSocket):
+    def rsu_info_to_db(lane_num, park_code, sn):
         """
         天线数据入库
         """
@@ -54,8 +54,9 @@ class DBOPeration(object):
 
         DBClient.add(db_session=db_session,
                      orm=RSUInfoOrm(id=CommonUtil.random_str(32).lower(),
-                                    lane_num=rsu_client.lane_num,
-                                    park_code=rsu_client.rsu_conf['park_code'],
+                                    lane_num=lane_num,
+                                    park_code=park_code,
+                                    sn=sn,
                                     heartbeat_latest=datetime.now()
                                     ))
         db_session.close()
