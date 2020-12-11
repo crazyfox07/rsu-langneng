@@ -78,6 +78,9 @@ class ThirdEtcApi(object):
         """
         平台参数下载-发行方黑名单接口
         """
+        if not os.path.exists(os.path.join(CommonConf.SQLITE_DIR, 'fxf_blacklist.pkl')):
+            logger.info('fxf_blacklist.pkl not exists')
+            ThirdEtcApi.download_fxf_blacklist()
         with open(os.path.join(CommonConf.SQLITE_DIR, 'fxf_blacklist.pkl'), 'rb') as fr:
             fxf_blacklist = pickle.load(fr)
             for fxf_black_item in fxf_blacklist:
