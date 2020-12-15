@@ -19,19 +19,28 @@ class EtcService(object):
         查询etc扣费状态
         :param order_id: 订单号
         """
-        result = dict(flag=False,
-                      msg='没有此订单: {}'.format(order_id))
+        result = {
+            "flag": False,
+            "errorCode": "",
+            "errorMessage": "",
+            "data": None
+        }
+
         _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                           sqlite_database='etc_deduct.sqlite')
-        etc_request_orm:ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
+        etc_request_orm: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
             ETCRequestInfoOrm.trans_order_no == order_id).first()
         if etc_request_orm:
             deduct_status = etc_request_orm.deduct_status
-            result['msg'] = deduct_status
+            result['data'] = deduct_status
             if deduct_status == EtcDeductStatus.SUCCESS:
                 result['flag'] = True
             elif deduct_status == EtcDeductStatus.DEDUCTING:
                 create_time = etc_request_orm.create_time
                 if (datetime.now() - create_time).seconds > 10:  # 超过10s还是DEDUCTING，认为没有检测到obu
-                    result['msg'] = EtcDeductStatus.NO_DETECT_OBU
+                    result['data'] = EtcDeductStatus.NO_DETECT_OBU
+        else:
+            msg = '没有此订单号: {}'.format(order_id)
+            result['data'] = msg
+            result['errorMessage'] = msg
         return result
