@@ -7,6 +7,16 @@ class CommandSendSet(object):
     """
     指令发送集合
     """
+    @staticmethod
+    def transfer_command(command):
+        """转义指令"""
+        command_list = []
+        for i in range(len(command)):
+            if i % 2 == 0:
+                command_list.append(command[i:i+2].replace('ff', 'fe01').replace('fe', 'fe00'))
+        result = ''.join(command_list)
+        return result
+
 
     @staticmethod
     def combine_c0(lane_mode='03', wait_time='02', tx_power='0a', pll_channel_id='00', trans_mode='02'):
@@ -31,7 +41,8 @@ class CommandSendSet(object):
         # 初始化指令
         c0 = ''.join(
             [rsctl, cmd_type, unix_time, current_time, lane_mode, wait_time, tx_power,
-             pll_channel_id, trans_mode]).replace('ff', 'fe01').replace('fe', 'fe00')
+             pll_channel_id, trans_mode])
+        c0 = CommandSendSet.transfer_command(c0)
         c0 = CommonConf.COMMAND_BEGIN_FLAG + c0
         # 异或校验值
         bcc = CommonUtil.bcc_xor(c0)
@@ -49,7 +60,8 @@ class CommandSendSet(object):
         # 序列号
         rsctl = CommonUtil.get_rsctl()
         cmd_type = 'c1'  # 指令代码，此处取值c1
-        c1 = ''.join([rsctl, cmd_type, obu_id, obu_div_factor]).replace('ff', 'fe01').replace('fe', 'fe00')
+        c1 = ''.join([rsctl, cmd_type, obu_id, obu_div_factor])
+        c1 = CommandSendSet.transfer_command(c1)
         c1 = CommonConf.COMMAND_BEGIN_FLAG + c1
         # 获取bcc校验值
         bcc = CommonUtil.bcc_xor(c1)
@@ -67,7 +79,8 @@ class CommandSendSet(object):
         # 序列号
         rsctl = CommonUtil.get_rsctl()
         cmd_type = 'c2'  # 指令代码，此处取值c1
-        c2 = ''.join([rsctl, cmd_type, obu_id, stop_type]).replace('ff', 'fe01').replace('fe', 'fe00')
+        c2 = ''.join([rsctl, cmd_type, obu_id, stop_type])
+        c2 = CommandSendSet.transfer_command(c2)
         c2 = CommonConf.COMMAND_BEGIN_FLAG + c2
         # 获取bcc校验值
         bcc = CommonUtil.bcc_xor(c2)
@@ -83,7 +96,8 @@ class CommandSendSet(object):
         """
         rsctl = CommonUtil.get_rsctl()
         cmd_type = 'c4'  # 指令代码，此处取值c1
-        c4 = ''.join([rsctl, cmd_type, control_type]).replace('ff', 'fe01').replace('fe', 'fe00')
+        c4 = ''.join([rsctl, cmd_type, control_type])
+        c4 = CommandSendSet.transfer_command(c4)
         c4 = CommonConf.COMMAND_BEGIN_FLAG + c4
         # 获取bcc校验值
         bcc = CommonUtil.bcc_xor(c4)
@@ -108,9 +122,17 @@ class CommandSendSet(object):
         rsctl = CommonUtil.get_rsctl()
         cmd_type = 'c6'  # 指令代码，此处取值c1
         c6 = ''.join([rsctl, cmd_type, obu_id, card_div_factor, reserved, deduct_amount,
-                      purchase_time, station]).replace('ff', 'fe01').replace('fe', 'fe00')
+                      purchase_time, station])
+        c6 = CommandSendSet.transfer_command(c6)
         c6 = CommonConf.COMMAND_BEGIN_FLAG + c6
         # 获取bcc校验值
         bcc = CommonUtil.bcc_xor(c6)
         c6 = c6 + bcc + CommonConf.COMMAND_END_FLAG
         return c6
+
+
+if __name__ == '__main__':
+    s = '89c05fe2fef520201222162525030201000238'
+    result = CommandSendSet.transfer_command(s)
+    print(s)
+    print(result)

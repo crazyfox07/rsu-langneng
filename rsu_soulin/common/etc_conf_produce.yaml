@@ -1,5 +1,5 @@
 dev_code: '00000002'  # 设备编号，运行本代码的机器编号，非天线
-wugan: "true"
+wugan: "false"
 etc:
   - lane_num: '4028818a76020217017607be4d0a0002'   # 车道号 出口1
     park_code: '371109'  # 停车场编号
