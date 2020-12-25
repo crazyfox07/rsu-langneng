@@ -54,7 +54,7 @@ class RsuStatus(object):
             rsu_pids.append(rsu_infor_orm.pid)
             time_diff_seconds = (now - rsu_infor_orm.heartbeat_latest).seconds
             # 查看天线状态，status=0需要重启etc扣费，一般socket监听超时会更新RSUInfoOrm的status为0
-            if rsu_infor_orm.status == 0:
+            if (rsu_infor_orm.status == 0) or (time_diff_seconds >= 300):
                 logger.error('park_code: {}, lane_num: {} 的最新心跳时间： {}，距离当前已过：{}s'.format(
                     rsu_infor_orm.park_code,
                     rsu_infor_orm.lane_num,
