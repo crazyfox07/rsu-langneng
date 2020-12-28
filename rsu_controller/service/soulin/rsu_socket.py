@@ -364,10 +364,13 @@ class RsuSocket(object):
                                 "params": params}
         # 业务编码报文json格式
         etc_deduct_info_json = json.dumps(etc_deduct_info_dict, ensure_ascii=False)
-        # TODO 进行到此步骤，表示etc扣费成功，调用强哥接口
-        payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
-        res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(self.rsu_conf['park_code'], body.trans_order_no,
+        # 进行到此步骤，表示etc扣费成功，如果etc_deduct_notify_url不为空，通知抬杆
+        if CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']:
+            payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
+            res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(self.rsu_conf['park_code'], body.trans_order_no,
                                                                    body.discount_amount, body.deduct_amount, payTime)
+        else:
+            res_etc_deduct_notify_flag = True
         if res_etc_deduct_notify_flag:
             # 接收到强哥返回值后，上传etc扣费数据
             upload_flag, upload_fail_count = ThirdEtcApi.etc_deduct_upload(etc_deduct_info_json)
