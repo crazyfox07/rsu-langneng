@@ -26,6 +26,10 @@ if CommonConf.ETC_MAKER == 'soulin':
     from service.soulin.rsu_socket import RsuSocket
 elif CommonConf.ETC_MAKER == 'jinyi':
     from service.jinyi.rsu_socket import RsuSocket
+elif CommonConf.ETC_MAKER == 'wanji':
+    from service.wanji.rsu_socket import RsuSocket
+else:
+    logger.error('配置文件有误，找不到对应厂家的etc')
 
 from service.wuganzhifu import WuGan
 
@@ -82,6 +86,19 @@ class EtcToll(object):
                     break
                 # 检测到obu, 检测到obu时，会狂发b2指令，频繁的更新数据库，所以此种情况下不要更新天线心跳时间
                 logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
+            elif CommonConf.ETC_MAKER == 'wanji':
+                if msg_str[16: 20] == 'b100' :
+                    logger.info('lane_num:{}  心跳指令：{}， 天线时间：{}， 当前时间：{}'.format(rsu_client.lane_num, msg_str,
+                                                                                rsu_client.rsu_heartbeat_time,
+                                                                                datetime.now()))
+                    DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
+                    continue
+                elif msg_str[16: 18] == 'b1':
+                    logger.error('心跳出错：{}'.format(msg_str))
+                    continue
+                else:
+                    # 检测到obu, 检测到obu时，会狂发b2指令，频繁的更新数据库，所以此种情况下不要更新天线心跳时间
+                    logger.info('lane_num:{}  接收到指令: {}'.format(rsu_client.lane_num, msg_str))
 
             # 查询数据库订单
             _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,

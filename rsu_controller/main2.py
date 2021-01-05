@@ -15,7 +15,14 @@ from common.log import logger
 from model.db_orm import RSUInfoOrm
 from service.db_operation import DBOPeration
 from service.etc_toll import EtcToll
-from service.soulin.rsu_socket import RsuSocket
+if CommonConf.ETC_MAKER == 'soulin':
+    from service.soulin.rsu_socket import RsuSocket
+elif CommonConf.ETC_MAKER == 'jinyi':
+    from service.jinyi.rsu_socket import RsuSocket
+elif CommonConf.ETC_MAKER == 'wanji':
+    from service.wanji.rsu_socket import RsuSocket
+else:
+    logger.error('配置文件有误，找不到对应厂家的etc')
 
 
 def clear_table_rsu_info():

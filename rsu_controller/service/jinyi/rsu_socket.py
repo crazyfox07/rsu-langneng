@@ -125,7 +125,7 @@ class RsuSocket(object):
     @func_set_timeout(CommonConf.ETC_CONF_DICT['recv_msg_max_wait_time'])
     def recv_msg_max_wait_time(self):
         # 接收数据
-        msg_bytes = self.socket_client.recv(1024).hex().replace('fe01', 'ff').replace('fe00', 'fe')
+        msg_bytes = self.socket_client.recv(1024).hex()
         return msg_bytes
 
     def fee_deduction(self, obu_body: ETCRequestInfoOrm):
@@ -163,7 +163,7 @@ class RsuSocket(object):
                 result['error_msg'] = '没有搜索到obu'
                 return result
             # 指令转义
-            msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
+            msg_str = msg_bytes.hex()  # 字节转十六进制
             if msg_str[8:10] == 'b2':
                 logger.info('接收b2心跳数据：{}'.format(msg_str))
                 if msg_str[10:12] == '00':

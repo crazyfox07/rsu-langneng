@@ -210,6 +210,24 @@ class CommonUtil(object):
         zf = zipfile.ZipFile(src_file)
         zf.extractall(dest_dir)
 
+    @staticmethod
+    def transfer_recv_command(command):
+        """转义接收到的指令"""
+        result = []
+        command_list = [command[i: i+2] for i in range(0, len(command), 2)]
+        for i in range(len(command_list)):
+            if command_list[i-1] != 'fe':
+                if command_list[i] == 'fe' and command_list[i + 1] == '01':
+                    result.append('ff')
+                else:
+                    result.append(command_list[i])
+            elif command_list[i] not in ['00', '01']:
+                result.append(command_list[i])
+            else:
+                continue
+        result = ''.join(result)
+        return result
+
 
 def crc162(x, invert):
     a = 0xFFFF
@@ -262,12 +280,12 @@ if __name__ == '__main__':
     # print(CommonUtil.time_difference(1599792556, 1599792656))
     # c = int(time.time())
     # bcc = CommonUtil.crc_jinyi('ffff000db00002fbc3d610000001110600')  # ('ffff0004b2000100')
-    s = 'ffff0004b2000100'
-    s = 'ffff000db00002fbc3d610000001110600'
-    s = 'ffff0047b502f7d5930200000d8f8d20201020164741000000006d000000000509006d08240379eac4f5350000000000000000000000000000000000000000000000000000000000000000'
-    s = 'ffff0004b2000000'
-    crc = CommonUtil.crc_jinyi(s)
-    print(crc)
+    # s = 'ffff0004b2000100'
+    # s = 'ffff000db00002fbc3d610000001110600'
+    # s = 'ffff0047b502f7d5930200000d8f8d20201020164741000000006d000000000509006d08240379eac4f5350000000000000000000000000000000000000000000000000000000000000000'
+    # s = 'ffff0004b2000000'
+    # crc = CommonUtil.crc_jinyi(s)
+    # print(crc)
     # print(c)
     # for _ in range(10):
     #     # a = CommonUtil.timestamp_format(timestamp=c, format='%Y%m%d%H%M%S')
@@ -279,6 +297,6 @@ if __name__ == '__main__':
     #
     # c = CommonUtil.timeformat_convert(timestr1='20200907094345', format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
     # print(c)
-    # plate_code = CommonUtil.parse_plate_code('b2e241313233343500000000')
-    # print(plate_code)
+    plate_code = CommonUtil.parse_plate_code('c2b34c373152383600000000')
+    print(plate_code, len('c2b34c373152383600000000'))
     # print(CommonUtil.hex_to_etcfee('000026d6', unit='fen'))

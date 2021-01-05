@@ -88,7 +88,7 @@ class RsuSocket(object):
 
         # 接收数据
         msg_bytes = self.socket_client.recv(1024)
-        msg_str = msg_bytes.hex()  # 字节转十六进制
+        msg_str = CommonUtil.transfer_recv_command(msg_bytes.hex())  # 字节转十六进制
         logger.info('接收数据： {}'.format(repr(msg_str)))
         # b0 天线设备状态信息帧
         if msg_str[6: 8] == 'b0':
@@ -116,8 +116,9 @@ class RsuSocket(object):
     @func_set_timeout(CommonConf.ETC_CONF_DICT['recv_msg_max_wait_time'])
     def recv_msg_max_wait_time(self):
         # 接收数据
-        msg_bytes = self.socket_client.recv(1024).hex().replace('fe01', 'ff').replace('fe00', 'fe')
-        return msg_bytes
+        msg_bytes_hex = self.socket_client.recv(1024).hex()
+        msg_str = CommonUtil.transfer_recv_command(msg_bytes_hex)
+        return msg_str
 
     def fee_deduction(self, obu_body: ETCRequestInfoOrm):
         """
@@ -155,7 +156,7 @@ class RsuSocket(object):
                 result['error_msg'] = '没有搜索到obu'
                 return result
             # 指令转义
-            msg_str = msg_bytes.hex().replace('fe01', 'ff').replace('fe00', 'fe')  # 字节转十六进制
+            msg_str = CommonUtil.transfer_recv_command(msg_bytes.hex()) # 字节转十六进制
             logger.info('接收数据： {}'.format(repr(msg_str)))
             # b2 电子标签信息帧
             if msg_str[6:8] == 'b2':
