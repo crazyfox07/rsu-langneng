@@ -224,8 +224,8 @@ class ThirdEtcApi(object):
                  ETCFeeDeductInfoOrm.upload_flag == 0))
         for item in query_items:
             #  调用第三方api
-            request_flag = ThirdEtcApi.etc_deduct_upload(item.etc_info)
-            if request_flag:  # 如果上传成功，更新upload_flag为1
+            upload_flag, upload_fail_count = ThirdEtcApi.etc_deduct_upload(item.etc_info)
+            if upload_flag:  # 如果上传成功，更新upload_flag为1
                 item.upload_flag = 1
             else:  # 如果上传失败，更新upload_fail_count 加 1
                 item.upload_fail_count += 1
