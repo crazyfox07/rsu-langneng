@@ -9,7 +9,7 @@ block_cipher = None
 a = Analysis(['main.py'],
              pathex=[],
              binaries=[],
-             datas=[('./common/etc_conf.yaml', './common'), ('./deploy', 'deploy'), ('./sqlite_db', './sqlite_db')],
+             datas=[('./common/etc_conf.yaml', './common'), ('./deploy', 'deploy'), ('./sqlite_db/fxf_blacklist.pkl', './sqlite_db')],
              hiddenimports= ['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols',
                              'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets',
                              'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'main'],

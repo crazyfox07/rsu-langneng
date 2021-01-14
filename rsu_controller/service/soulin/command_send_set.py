@@ -13,7 +13,12 @@ class CommandSendSet(object):
         command_list = []
         for i in range(len(command)):
             if i % 2 == 0:
-                command_list.append(command[i:i+2].replace('ff', 'fe01').replace('fe', 'fe00'))
+                tmp = command[i:i+2]
+                if tmp == 'ff':
+                    tmp = 'fe01'
+                elif tmp == 'fe':
+                    tmp = 'fe00'
+                command_list.append(tmp)
         result = ''.join(command_list)
         return result
 

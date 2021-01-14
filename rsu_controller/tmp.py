@@ -73,9 +73,27 @@ def ttt():
     data_df.to_excel('导航骑行距离.xlsx')
 
 
+import requests
+import pandas as pd
+
+
+def tttt():
+    df = pd.read_excel('公交OD数据.xls')
+    for index in df.index:
+        origin_lon, origin_lat, dest_lon, dest_lat = df.loc[index, ['longitude', 'latitude', 'longitude.1', 'latitude.1']]
+        url = 'https://restapi.amap.com/v3/direction/transit/integrated?origin={0},{1}&destination={2},{3}&city=日照&strategy=3&output=json&key=cebfccd04be1f4881f97dfdf4996ede8'.format(
+            origin_lon, origin_lat, dest_lon, dest_lat
+        )
+
+        res = requests.get(url)
+        data = res.json()
+        item = data['route']['transits'][0]
+        duration, distance = item['duration'], item['distance']
+        # print(duration, distance)
+        df.loc[index, 'duration'] = duration
+        df.loc[index, 'distance'] = distance
+    df.to_excel('output.xlsx')
+
+
 if __name__ == '__main__':
-    # excutors = ThreadPoolExecutor(max_workers=255)
-    # for i in range(1, 255):
-    #     excutors.submit(ping, i)
-    # log_with_single_process('process-1')
-    multiprocess_log()
+    tttt()
