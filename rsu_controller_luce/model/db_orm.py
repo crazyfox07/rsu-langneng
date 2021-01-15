@@ -18,6 +18,15 @@ db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR, sqli
 Base = declarative_base()
 
 
+class VehicleInfoOrm(Base):
+    """车辆信息"""
+    __tablename__ = 'vehicle_info'
+    id = Column('id', String(32), primary_key=True)
+    vehicle_info = Column('vehicle_info', String(1024))
+    upload_flag = Column('upload_flag', SmallInteger)
+    upload_fail_count = Column('upload_fail_count', Integer)
+    create_time = Column('create_time', DateTime, default=datetime.now)  # now加括号的话数据都是这个固定时间
+
 class ETCFeeDeductInfoOrm(Base):
     __tablename__ = 'etc_fee_deduct_info'
     # TODO 注意添加到表中的数据是否为都相同

@@ -12,6 +12,7 @@ import traceback
 from sqlalchemy import and_
 
 from common.config import CommonConf
+from common.db_client import create_db_session, DBClient
 from common.http_client import http_session
 from common.log import logger
 from common.sign_verify import XlapiSignature
@@ -19,7 +20,7 @@ from common.utils import CommonUtil
 from datetime import datetime, timedelta
 import time
 
-from model.db_orm import db_session, ETCFeeDeductInfoOrm
+from model.db_orm import db_session, ETCFeeDeductInfoOrm, VehicleInfoOrm
 
 
 class ThirdEtcApi(object):
@@ -102,7 +103,48 @@ class ThirdEtcApi(object):
         except:
             logger.error(traceback.format_exc())
         upload_fail_count = 0 if upload_flag else 1
+        if not upload_flag:
+            db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                                      sqlite_database='etc_deduct.sqlite')
+            # etc_deduct_info_json入库
+            DBClient.add(db_session=db_session,
+                         orm=VehicleInfoOrm(id=CommonUtil.random_str(32).lower(),
+                                            vehicle_info=vehicle_info_json,
+                                            upload_flag=upload_flag,
+                                            upload_fail_count=upload_fail_count))
+            db_session.close()
+            db_engine.dispose()
         return upload_flag, upload_fail_count
+
+    @staticmethod
+    def reupload_vehicle_plate():
+        # 查询过去一天上传失败的
+        query_items = db_session.query(VehicleInfoOrm).filter(
+            and_(VehicleInfoOrm.create_time > (datetime.now() - timedelta(days=2)),
+                 VehicleInfoOrm.upload_flag == 0))
+        for item in query_items:
+            vehicle_info_json = item.vehicle_info
+            # 将data 值base64 后，使用SHA256WithRSA 计算签名
+            sign = XlapiSignature.to_sign_with_private_key(vehicle_info_json, private_key=ThirdEtcApi.PRIVATE_KEY)
+            upload_body = dict(appid=ThirdEtcApi.APPID,
+                               data=vehicle_info_json,
+                               sign=sign.decode(encoding='utf8'))
+            logger.info('上传车辆信息： {}'.format(vehicle_info_json))
+            try:
+                res = http_session.post(ThirdEtcApi.ETC_UPLOAD_URL, data=upload_body)
+                if res.json()['code'] == '000000':
+                    db_session.delete(item)
+                else:
+                    item.upload_fail_count += 1
+            except:
+                item.upload_fail_count += 1
+                logger.error(traceback.format_exc())
+            # 数据修改好后提交
+            try:
+                db_session.commit()
+            except:
+                db_session.rollback()
+                logger.error(traceback.format_exc())
 
     @staticmethod
     def exists_in_blacklist(issuer_identifier, card_net, card_id):
@@ -279,11 +321,30 @@ class ThirdEtcApi(object):
             logger.error(traceback.format_exc())
         return False
 
+    @staticmethod
+    def query_owe_history():
+        """查询欠费历史"""
+        method_name = 'queryArrearageOrderInfoNoPic.do'
+        data = dict(plateNo='川YP37431',
+                    plateType='7201')
+        data = json.dumps(data, ensure_ascii=False)
+        current_time = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+        print(method_name, current_time, data)
+        sign_value = method_name + current_time + ThirdEtcApi.APPID + data
+        sign = XlapiSignature.to_sign_with_private_key(sign_value, private_key=ThirdEtcApi.PRIVATE_KEY)
+        body = dict(t=current_time,
+                    appid=ThirdEtcApi.APPID,
+                    data=data,
+                    sign=sign)
+        res = http_session.post(url='http://58.59.49.122:10001/vvpos/api/vpos/queryArrearageOrderInfoNoPic.do', data=body)  # http://lnetc1.c2s.pub:6868 http://58.59.49.122:8810
+        print(res.json())
+
 
 if __name__ == '__main__':
     print('start')
-    res = ThirdEtcApi.upload_vehicle_plate_no('371143', '鲁L12345', '0')
-    print(res)
+    # res = ThirdEtcApi.upload_vehicle_plate_no('371143', '鲁L12345', '0')
+    ThirdEtcApi.query_owe_history()
+    # print(res)
     # ThirdEtcApi.etc_deduct_notify('371104', '33ujwhdfsuh2389fsfd', 0, 0.01, "2020-09-25 00:00:00")
     # query_items = db_session.query(ETCFeeDeductInfoOrm).filter(
     #     and_(ETCFeeDeductInfoOrm.create_time > (datetime.now() - timedelta(seconds=3600)),

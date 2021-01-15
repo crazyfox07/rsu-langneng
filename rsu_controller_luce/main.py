@@ -69,8 +69,8 @@ def init_scheduler():
 
     # scheduler.add_job(ThirdEtcApi.download_blacklist_base, trigger='cron', hour='1')
     # scheduler.add_job(ThirdEtcApi.download_blacklist_incre, trigger='cron', hour='*/1')
-
-    # scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
+    scheduler.add_job(ThirdEtcApi.reupload_vehicle_plate, trigger='cron', hour='*/1')
+    scheduler.add_job(ThirdEtcApi.reupload_etc_deduct_from_db, trigger='cron', hour='*/1')
     scheduler.add_job(RsuStatus.check_rsu_heartbeat, trigger='cron', minute='*/1',
                       kwargs={'callback': ThirdEtcApi.tianxian_heartbeat}, max_instances=2, id='check_rsu_heartbeat')
 
