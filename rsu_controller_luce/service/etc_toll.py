@@ -38,6 +38,7 @@ class EtcToll(object):
             try:
                 msg_str = rsu_client.recv_msg_max_wait_time()
             except:
+                DBOPeration.update_rsu_pid_status(rsu_client, 0)
                 err_msg = traceback.format_exc()
                 logger.error(err_msg)
                 if err_msg.find('远程主机强迫关闭了一个现有的连接') != -1 or err_msg.find('你的主机中的软件中止了一个已建立的连接') != -1:
@@ -85,7 +86,7 @@ class EtcToll(object):
                 # TODO 该处为测试，待删，扣所有obu的车费
                 if plate_no:
                     plate_no_test = '鲁L12345'
-                    query_vehicle_owe: VehicleOweOrm = DBClient.query_vehicle_owe(plate_no_test, plate_color)  # 查询欠费车辆信息
+                    query_vehicle_owe: VehicleOweOrm = DBClient.query_vehicle_owe('鲁L12345', '0000')  # 查询欠费车辆信息
                     query_vehicle_owe.plate_no = plate_no
                 else:
                     query_vehicle_owe = None

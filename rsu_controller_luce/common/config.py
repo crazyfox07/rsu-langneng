@@ -68,6 +68,7 @@ class CommonConf(object):
     VEHICLE_OWE_FILE_PATH = os.path.join(ROOT_DIR, 'common', 'vehicle_owe_list.txt')
     # 当前天线的进程
     RSU_PROCESS = None
+    PROCESS_EXECUTOR = None
 
 
 class StatusFlagConfig(Enum):

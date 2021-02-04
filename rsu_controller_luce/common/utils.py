@@ -9,7 +9,7 @@ import requests
 import os
 import re
 import sys
-
+import signal
 from common.config import CommonConf
 from datetime import datetime
 from common.log import logger
@@ -17,23 +17,13 @@ from common.log import logger
 
 class CommonUtil(object):
 
-    # @staticmethod
-    # def restart_rsu_control():
-    #     """
-    #     重启天线服务
-    #     @return:
-    #     """
-    #     pass
-        # logger.info('===========重启天线============')
-        # rsu_script_filename = 'main2.py'
-        # # 找出进程号
-        # pids = CommonUtil.query_pids(rsu_script_filename)
-        # if pids:
-        #     os.system('kill -9 {}'.format(pids))  # 杀死进程
-        #     logger.info('kill -9 {}'.format(pids))
-        # # 重启天线
-        # rsu_script_path = os.path.join(CommonConf.ROOT_DIR, rsu_script_filename)
-        # os.system('nohup python3 {} &'.format(rsu_script_path))
+    @staticmethod
+    def kill_process_by_pid(pids):
+        """
+        根据pid结束进程
+        """
+        for pid in pids:
+            os.kill(pid, signal.SIGTERM)
 
     @staticmethod
     def query_pids(query_str):

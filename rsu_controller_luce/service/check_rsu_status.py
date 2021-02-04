@@ -50,20 +50,28 @@ class RsuStatus(object):
         db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                                   sqlite_database='etc_deduct.sqlite')
         rsu_info_orms = db_session.query(RSUInfoOrm).all()
+        rsu_pids = list()
         now = datetime.datetime.now()
         for rsu_infor_orm in rsu_info_orms:
+            rsu_pids.append(rsu_infor_orm.pid)
             time_diff_seconds = (now - rsu_infor_orm.heartbeat_latest).seconds
-            # 如果三分钟没有心跳，需要重启etc扣费
-            if time_diff_seconds > 60:
-                logger.error('park_code: {}, lane_num: {} 的最新心跳时间： {}，距离当前已过：{}s'.format(rsu_infor_orm.park_code,
-                            rsu_infor_orm.lane_num, rsu_infor_orm.heartbeat_latest, time_diff_seconds))
+            # 查看天线状态，status=0需要重启etc扣费，一般socket监听超时会更新RSUInfoOrm的status为0
+            if (rsu_infor_orm.status == 0) or (time_diff_seconds >= 60):
+                logger.error('park_code: {}, lane_num: {} 的最新心跳时间： {}，距离当前已过：{}s'.format(
+                    rsu_infor_orm.park_code,
+                    rsu_infor_orm.lane_num,
+                    rsu_infor_orm.heartbeat_latest,
+                    time_diff_seconds))
                 upload_rsu_heartbeat_dict['rsu_broke_list'].append(rsu_infor_orm.sn)
 
         if upload_rsu_heartbeat_dict['rsu_broke_list']:
             upload_rsu_heartbeat_dict['status_code'] = '01'
             logger.error('天线 {} 出现故障'.format(','.join(upload_rsu_heartbeat_dict['rsu_broke_list'])))
+            # 结束进程
+            logger.info('*********************kill pid: {}*************************************'.format(
+                ','.join([str(item) for item in rsu_pids])))
+            CommonUtil.kill_process_by_pid(rsu_pids)
             logger.info("==================重启天线服务================")
-            # TODO
             RsuStatus.restart_rsu_control()
             # rsu_script_filename = 'main2.py'
             # # 找出进程号
