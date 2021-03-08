@@ -4,11 +4,13 @@ import uvicorn
 import os
 import traceback
 
+import yaml
 from apscheduler import events
 from apscheduler.executors.pool import ProcessPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from common.config import CommonConf
 from common.log import logger
@@ -19,7 +21,30 @@ from service.db_operation import DBOPeration
 from service.etc_service import EtcService
 from service.third_etc_api import ThirdEtcApi
 
-app = FastAPI()
+
+def init_app():
+    """
+    初始化app
+    :return:
+    """
+    api = FastAPI()
+
+    origins = [
+        "http://localhost:8002",
+        "http://localhost:9528",
+    ]
+
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    return api
+
+
+app = init_app()
 
 # scheduler = AsyncIOScheduler()
 scheduler = BackgroundScheduler()
@@ -124,9 +149,40 @@ def etc_deduct_status(order_id: str):
     return result
 
 
-@app.get('/')
-def head():
-    return dict(hello='world')
+@app.get("/etc_config")
+def get_etc_config():
+    """
+    获取etc配置
+    """
+    result = dict(data=CommonConf.ETC_CONF_DICT)
+    return result
+
+
+@app.post("/change_config")
+def etc_fee_deduction(body: list):
+    """
+    etc扣费
+    :param body:
+    :return:
+    """
+
+    try:
+        logger.info('修改配置信息')
+        CommonConf.ETC_CONF_DICT['etc'] = body
+        file_path = CommonConf.ETC_CONF_PATH
+        with open(file_path, 'w', encoding='utf-8') as fw:
+            yaml.safe_dump(CommonConf.ETC_CONF_DICT, fw)
+        result = dict(flag=True,
+                      errorCode='',
+                      errorMessage='',
+                      data="修改配置信息成功")
+    except:
+        logger.error(traceback.format_exc())
+        result = dict(flag=False,
+                      errorCode='01',
+                      errorMessage='修改配置信息失败',
+                      data=None)
+    return result
 
 
 if __name__ == '__main__':
