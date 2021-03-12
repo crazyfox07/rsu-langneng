@@ -298,11 +298,11 @@ class RsuSocket(object):
         card_type = str(int(self.command_recv_set.info_b4['CardType'], 16))
         # PSAM 卡编号 10字节
         try:
-            psam_id = self.command_recv_set.info_ba['PsamSN']
+            psam_id = self.command_recv_set.info_b4['ICCFile0015'][20: 40]
         except:
             print(self.command_recv_set.info_ba)
         #  card_sn 物理卡号 8字节
-        card_sn = psam_id[4:]
+        card_sn = self.command_recv_set.info_b4['UserCardNo']
         # TODO 待确认
         logger.info('ETC 卡片类型（22:储值卡；23:记账卡）: {}'.format(card_type))
         params = dict(algorithm_type="1",
