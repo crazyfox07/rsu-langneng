@@ -159,12 +159,17 @@ class RsuSocket(object):
                     plate_no = CommonUtil.parse_plate_code(info_b4['VehicleInfo'][:24])
                     # 车牌颜色
                     obu_plate_color = str(int(self.command_recv_set.info_b4['VehicleInfo'][24: 26], 16))  # obu车颜色
-                    if (obu_body.plate_no != plate_no) or (int(obu_body.plate_color_code) != int(obu_plate_color)):
+                    if (obu_body.plate_no != plate_no):
+                        error_msg = '车牌号不匹配，监控获取的车牌号：%s,obu获取的车牌号：%s'.format(
+                            obu_body.plate_no, plate_no)
+
+                        result['error_msg'] = error_msg
+                        return result
+                    elif int(obu_body.plate_color_code) != int(obu_plate_color):
                         error_msg = "车牌号或车颜色不匹配： 监控获取的车牌号：%s, 车颜色：%s; obu获取的车牌号：%s,车颜色：%s" % (
                             obu_body.plate_no, obu_body.plate_color_code, plate_no, obu_plate_color)
                         logger.error(error_msg)
-                        result['error_msg'] = error_msg
-                        return result
+                        # todo 颜色不对，继续扣费
                     # 发送c6消费交易指令
                     c6 = CommandSendSet.combine_c6(obuid, obu_div_factor, consume_money, purchase_time, station)
                     logger.info('发送c6指令：{}'.format(c6))
@@ -272,37 +277,42 @@ class RsuSocket(object):
                       trans_type='09',  # 交易类型（06:传统；09:复合）
                       vehicle_type=str(int(self.command_recv_set.info_b4['VehicleInfo'][26: 28]))  # 收费车型
                       )
-        etc_deduct_info_dict = {"method": "etcPayUpload",
-                                "params": params}
-        # 业务编码报文json格式
-        etc_deduct_info_json = json.dumps(etc_deduct_info_dict, ensure_ascii=False)
-        # 进行到此步骤，表示etc扣费成功，如果etc_deduct_notify_url不为空，通知抬杆
-        if CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']:
-            payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
-            res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(self.rsu_conf['park_code'], body.trans_order_no,
-                                                                       body.discount_amount, body.deduct_amount,
-                                                                       payTime)
-        else:
-            res_etc_deduct_notify_flag = True
-        if res_etc_deduct_notify_flag:
-            # 接收到强哥返回值后，上传etc扣费数据
-            upload_flag, upload_fail_count = ThirdEtcApi.etc_deduct_upload(etc_deduct_info_json)
-            db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
-                                                      sqlite_database='etc_deduct.sqlite')
-            # etc_deduct_info_json入库
-            DBClient.add(db_session=db_session,
-                         orm=ETCFeeDeductInfoOrm(id=CommonUtil.random_str(32).lower(),
-                                                 trans_order_no=body.trans_order_no,
-                                                 etc_info=etc_deduct_info_json,
-                                                 upload_flag=upload_flag,
-                                                 upload_fail_count=upload_fail_count))
-            db_session.close()
-            db_engine.dispose()
+        if params['trans_before_balance'] - params['deduct_amount'] != params['balance']:
+            result['error_msg'] = '交易前余额 - 扣款 != 交易后余额'
+            logger.error(str(params))
+            return result
+        # etc_deduct_info_dict = {"method": "etcPayUpload",
+        #                         "params": params}
+        # # 业务编码报文json格式
+        # etc_deduct_info_json = json.dumps(etc_deduct_info_dict, ensure_ascii=False)
+        # # 进行到此步骤，表示etc扣费成功，如果etc_deduct_notify_url不为空，通知抬杆
+        # if CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']:
+        #     payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
+        #     res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(self.rsu_conf['park_code'], body.trans_order_no,
+        #                                                                body.discount_amount, body.deduct_amount,
+        #                                                                payTime)
+        # else:
+        #     res_etc_deduct_notify_flag = True
+        # if res_etc_deduct_notify_flag:
+        #     # 接收到强哥返回值后，上传etc扣费数据
+        #     upload_flag, upload_fail_count = ThirdEtcApi.etc_deduct_upload(etc_deduct_info_json)
+        #     db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+        #                                               sqlite_database='etc_deduct.sqlite')
+        #     # etc_deduct_info_json入库
+        #     DBClient.add(db_session=db_session,
+        #                  orm=ETCFeeDeductInfoOrm(id=CommonUtil.random_str(32).lower(),
+        #                                          trans_order_no=body.trans_order_no,
+        #                                          etc_info=etc_deduct_info_json,
+        #                                          upload_flag=upload_flag,
+        #                                          upload_fail_count=upload_fail_count))
+        #     db_session.close()
+        #     db_engine.dispose()
 
         # 清除收集到的b2，b3, b4, b5
         self.command_recv_set.clear_info_b12345()
         result['flag'] = True
         result['data'] = params
+        result['exit_time'] = exit_time
         return result
 
     def card_sn_in_blacklist(self):

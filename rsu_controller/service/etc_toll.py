@@ -14,13 +14,14 @@ from func_timeout import func_set_timeout
 from sqlalchemy import and_
 
 from common.config import CommonConf
-from common.db_client import create_db_session
+from common.db_client import create_db_session, DBClient
 from common.log import logger
 from common.utils import CommonUtil
-from model.db_orm import ETCRequestInfoOrm
+from model.db_orm import ETCRequestInfoOrm, ETCFeeDeductInfoOrm
 from model.etc_deduct_status import EtcDeductStatus
 from service.db_operation import DBOPeration
 from service.db_rsu_charge import DBRsuCharge
+from service.third_etc_api import ThirdEtcApi
 
 if CommonConf.ETC_MAKER == 'soulin':
     from service.soulin.rsu_socket import RsuSocket
@@ -111,37 +112,39 @@ class EtcToll(object):
             if query_item:
                 logger.info('开始扣费。。。。。。')
                 logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
-                etc_result = EtcToll.toll(query_item, rsu_client)
-                query_item.flag = 1
-
-                if etc_result['flag']:
-                    logger.info('...................扣费成功........................')
-                    query_item.deduct_status = EtcDeductStatus.SUCCESS
-                else:
-                    logger.info('...................扣费失败........................')
-                    query_item.deduct_status = EtcDeductStatus.FAIL
-                # 数据修改好后提交
-                try:
-                    db_session.commit()
-                except:
-                    db_session.rollback()
-                    logger.error(traceback.format_exc())
+                logger.info('{}'.format(query_item.park_code))
+                EtcToll.toll(query_item, rsu_client, db_session)
+                # query_item.flag = 1
+                #
+                # if etc_result['flag']:
+                #     logger.info('...................扣费成功........................')
+                #     query_item.deduct_status = EtcDeductStatus.SUCCESS
+                # else:
+                #     logger.info('...................扣费失败........................')
+                #     query_item.deduct_status = EtcDeductStatus.FAIL
+                # # 数据修改好后提交
+                # try:
+                #     db_session.commit()
+                # except:
+                #     db_session.rollback()
+                #     logger.error(traceback.format_exc())
 
             else:
-                # 没有查询到订单，pass
-                pass
-            db_session.close()
+                db_session.close()
 
 
     @staticmethod
     @func_set_timeout(CommonConf.FUNC_TIME_OUT)
-    def toll(body: ETCRequestInfoOrm, rsu_client: RsuSocket) -> dict:
+    def toll(body: ETCRequestInfoOrm, rsu_client: RsuSocket, db_session) -> dict:
         """
         etc收费
+        :param db_session:
         :param body: 接收到的数据
         :param rsu_client: socket客户端
         :return:
         """
+        body.flag = 1
+        handle_data_result = None
         # 默认扣费失败
         result = dict(flag=False,
                       errorCode='01',
@@ -170,59 +173,106 @@ class EtcToll(object):
                     result['errorMessage'] = message
             elif msg['flag'] is False:
                 result['errorMessage'] = msg['error_msg']
+                logger.info('...................扣费失败........................')
+                body.deduct_status = EtcDeductStatus.FAIL
             else:  # 表示交易成功
                 # etc扣费成功后做进一步数据解析
                 handle_data_result = rsu_client.handle_data(body)
                 result['flag'] = handle_data_result['flag']
                 result['errorMessage'] = handle_data_result['error_msg']
-                params = handle_data_result['data']
-                # handle_data_result['flag']=False一般是存在黑名单
-                if handle_data_result['flag'] and handle_data_result['data']:
-                    # 交易时间格式转换
-                    pay_time = CommonUtil.timeformat_convert(timestr1=params['exit_time'], format1='%Y%m%d%H%M%S',
-                                                             format2='%Y-%m-%d %H:%M:%S')
-                    result['data'] = dict(parkCode=params['park_code'],
-                                          orderNo=params['trans_order_no'],
-                                          outTradeNo=params['trans_order_no'],
-                                          payFee=params['deduct_amount'] / 100,
-                                          derateFee=params['discount_amount'],
-                                          payTime=pay_time)
-                    # result['data'] = '交易成功'
-                    data = dict(method='etcPayUpload',
-                                params=params, )
-                    logger.info('etc交易成功')
-                    logger.info(json.dumps(data, ensure_ascii=False))
+                if handle_data_result['flag']:
+                    logger.info('...................扣费成功........................')
+                    body.deduct_status = EtcDeductStatus.SUCCESS
+                else:
+                    logger.info('...................扣费失败........................')
+                    body.deduct_status = EtcDeductStatus.FAIL
         except:
             logger.error(traceback.format_exc())
         # 记入日志
         logger.info(json.dumps(result, ensure_ascii=False))
+        # 数据修改好后提交
+        DBClient.db_sesson_commit(db_session)
+        if handle_data_result and handle_data_result['flag'] and handle_data_result['data']:
+            data = dict(method='etcPayUpload',
+                        params=handle_data_result['data'], )
+            logger.info('etc交易成功')
+            logger.info(json.dumps(data, ensure_ascii=False))
+            # 通知抬杆， 上传etc数据，并将etc数据存入本地
+            try:
+
+                EtcToll.etc_upload_and_addto_db(handle_data_result, body)
+            except:
+                logger.error(traceback.format_exc())
+        db_session.close()
         return result
+
+    @staticmethod
+    def etc_upload_and_addto_db(handle_data_result, body: ETCRequestInfoOrm):
+        """
+        通知抬杆， 上传etc数据，并将etc数据存入本地
+        :param handle_data_result:
+        :param body:
+        :return:
+        """
+        params = handle_data_result['data']
+        exit_time = handle_data_result['exit_time']
+        park_code = body.park_code
+        etc_deduct_info_dict = {"method": "etcPayUpload",
+                                "params": params}
+        # 业务编码报文json格式
+        etc_deduct_info_json = json.dumps(etc_deduct_info_dict, ensure_ascii=False)
+        logger.info('=' * 160)
+        logger.info(etc_deduct_info_json)
+        # 进行到此步骤，表示etc扣费成功，如果etc_deduct_notify_url不为空，通知抬杆
+        if CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']:
+            payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
+            res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(park_code, body.trans_order_no,
+                                                                       body.discount_amount, body.deduct_amount,
+                                                                       payTime)
+        else:
+            res_etc_deduct_notify_flag = True
+        logger.info('=' * 160)
+        if res_etc_deduct_notify_flag:
+            # 接收到强哥返回值后，上传etc扣费数据
+            logger.info('=' * 160)
+            upload_flag, upload_fail_count = ThirdEtcApi.etc_deduct_upload(etc_deduct_info_json)
+            db_engine, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+                                                      sqlite_database='etc_deduct.sqlite')
+            # etc_deduct_info_json入库
+            DBClient.add(db_session=db_session,
+                         orm=ETCFeeDeductInfoOrm(id=CommonUtil.random_str(32).lower(),
+                                                 trans_order_no=body.trans_order_no,
+                                                 etc_info=etc_deduct_info_json,
+                                                 upload_flag=upload_flag,
+                                                 upload_fail_count=upload_fail_count))
+            db_session.close()
+            db_engine.dispose()
 
 
 
 
 if __name__ == '__main__':
     # 查询数据库订单
-    _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
+    _, db_session1 = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                       sqlite_database='etc_deduct.sqlite')
-    query_item: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
+    query_item1: ETCRequestInfoOrm = db_session1.query(ETCRequestInfoOrm).filter(
         and_(ETCRequestInfoOrm.lane_num == '002',
              ETCRequestInfoOrm.create_time > (datetime.now() - timedelta(seconds=12000)),
              ETCRequestInfoOrm.flag == 0)).order_by(ETCRequestInfoOrm.create_time.desc()).first()
 
     # 找到订单开始扣费
-    if query_item:
+    if query_item1:
         logger.info('开始扣费。。。。。。')
-        logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
-        query_item.flag = 3
+        logger.info('{}, {}'.format(query_item1.create_time, query_item1.flag))
+        query_item1.flag = 3
         # 数据修改好后提交
         try:
-            db_session.commit()
+            db_session1.commit()
         except:
-            db_session.rollback()
+            db_session1.rollback()
             logger.error(traceback.format_exc())
         logger.info('...................扣费成功........................')
     else:
         logger.info('........监听心跳........')
 
-    db_session.close()
+    db_session1.close()

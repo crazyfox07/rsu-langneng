@@ -101,6 +101,20 @@ class DBClient(object):
 
         return False
 
+    @staticmethod
+    def db_sesson_commit(current_db_session):
+        """
+        提交当前的db_session
+        :param current_db_session:
+        :return:
+        """
+        # 数据修改好后提交
+        try:
+            current_db_session.commit()
+        except:
+            current_db_session.rollback()
+            logger.error(traceback.format_exc())
+
 
 if __name__ == '__main__':
     # print(os.path.exists(CommonConf.ETC_CONF_DICT['sqlite_dir']))
