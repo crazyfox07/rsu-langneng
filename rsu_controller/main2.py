@@ -51,10 +51,10 @@ def single_process_etc_toll(etc_conf):
     status = 1
     # 添加天线的lane_num, park_code, heartbeat_latest,当前进程号pid，天线状态到etc_deduct.sqlite的表rsu_info中
     DBOPeration.rsu_info_to_db(lane_num, park_code, sn, os.getpid(), status)
-    # 创建天线对象
-    rsu_socket = RsuSocket(lane_num)
     # 进入到扣费监听状态
     try:
+        # 创建天线对象
+        rsu_socket = RsuSocket(lane_num)
         EtcToll.etc_toll(rsu_socket)
     except:
         logger.error(traceback.format_exc())
