@@ -113,21 +113,10 @@ class EtcToll(object):
                 logger.info('开始扣费。。。。。。')
                 logger.info('{}, {}'.format(query_item.create_time, query_item.flag))
                 logger.info('{}'.format(query_item.park_code))
-                EtcToll.toll(query_item, rsu_client, db_session)
-                # query_item.flag = 1
-                #
-                # if etc_result['flag']:
-                #     logger.info('...................扣费成功........................')
-                #     query_item.deduct_status = EtcDeductStatus.SUCCESS
-                # else:
-                #     logger.info('...................扣费失败........................')
-                #     query_item.deduct_status = EtcDeductStatus.FAIL
-                # # 数据修改好后提交
-                # try:
-                #     db_session.commit()
-                # except:
-                #     db_session.rollback()
-                #     logger.error(traceback.format_exc())
+                try:
+                    EtcToll.toll(query_item, rsu_client, db_session)
+                except:
+                    logger.error(traceback.format_exc())
 
             else:
                 db_session.close()

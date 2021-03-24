@@ -54,7 +54,10 @@ def single_process_etc_toll(etc_conf):
     # 创建天线对象
     rsu_socket = RsuSocket(lane_num)
     # 进入到扣费监听状态
-    EtcToll.etc_toll(rsu_socket)
+    try:
+        EtcToll.etc_toll(rsu_socket)
+    except:
+        logger.error(traceback.format_exc())
 
 
 def run_etc_toll():
