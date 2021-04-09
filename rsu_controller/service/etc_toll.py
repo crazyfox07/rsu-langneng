@@ -9,6 +9,7 @@ import time
 import traceback
 import json
 from datetime import datetime, timedelta
+from threading import Thread
 
 from func_timeout import func_set_timeout
 from sqlalchemy import and_
@@ -65,7 +66,8 @@ class EtcToll(object):
             if CommonConf.ETC_MAKER == 'soulin':
                 if msg_str[6:16] == 'b2ffffffff':  # 心跳指令
                     logger.info('lane_num:{}  心跳指令：{}， 天线时间：{}， 当前时间：{}'.format(rsu_client.lane_num, msg_str,
-                                                                                rsu_client.rsu_heartbeat_time, datetime.now()))
+                                                                                rsu_client.rsu_heartbeat_time,
+                                                                                datetime.now()))
                     DBOPeration.update_rsu_heartbeat(rsu_client)  # 心跳更新入库
                     continue
                 # # 检测到obu, 检测到obu时，会狂发b2指令，频繁的更新数据库，所以此种情况下不要更新天线心跳时间
@@ -120,7 +122,6 @@ class EtcToll(object):
 
             else:
                 db_session.close()
-
 
     @staticmethod
     @func_set_timeout(CommonConf.FUNC_TIME_OUT)
@@ -188,15 +189,20 @@ class EtcToll(object):
             logger.info(json.dumps(data, ensure_ascii=False))
             # 通知抬杆， 上传etc数据，并将etc数据存入本地
             try:
-
-                EtcToll.etc_upload_and_addto_db(handle_data_result, body)
+                body_dict = dict(park_code=body.park_code,
+                                 trans_order_no=body.trans_order_no,
+                                 discount_amount=body.discount_amount,
+                                 deduct_amount=body.deduct_amount)
+                t = Thread(target=EtcToll.etc_upload_and_addto_db, args=(handle_data_result, body_dict))
+                t.setDaemon(False)
+                t.start()
             except:
                 logger.error(traceback.format_exc())
         db_session.close()
         return result
 
     @staticmethod
-    def etc_upload_and_addto_db(handle_data_result, body: ETCRequestInfoOrm):
+    def etc_upload_and_addto_db(handle_data_result, body: dict):
         """
         通知抬杆， 上传etc数据，并将etc数据存入本地
         :param handle_data_result:
@@ -205,7 +211,7 @@ class EtcToll(object):
         """
         params = handle_data_result['data']
         exit_time = handle_data_result['exit_time']
-        park_code = body.park_code
+        park_code = body['park_code']
         etc_deduct_info_dict = {"method": "etcPayUpload",
                                 "params": params}
         # 业务编码报文json格式
@@ -215,8 +221,8 @@ class EtcToll(object):
         # 进行到此步骤，表示etc扣费成功，如果etc_deduct_notify_url不为空，通知抬杆
         if CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']:
             payTime = CommonUtil.timeformat_convert(exit_time, format1='%Y%m%d%H%M%S', format2='%Y-%m-%d %H:%M:%S')
-            res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(park_code, body.trans_order_no,
-                                                                       body.discount_amount, body.deduct_amount,
+            res_etc_deduct_notify_flag = ThirdEtcApi.etc_deduct_notify(park_code, body['trans_order_no'],
+                                                                       body['discount_amount'], body['deduct_amount'],
                                                                        payTime)
         else:
             res_etc_deduct_notify_flag = True
@@ -230,7 +236,7 @@ class EtcToll(object):
             # etc_deduct_info_json入库
             DBClient.add(db_session=db_session,
                          orm=ETCFeeDeductInfoOrm(id=CommonUtil.random_str(32).lower(),
-                                                 trans_order_no=body.trans_order_no,
+                                                 trans_order_no=body['trans_order_no'],
                                                  etc_info=etc_deduct_info_json,
                                                  upload_flag=upload_flag,
                                                  upload_fail_count=upload_fail_count))
@@ -238,12 +244,10 @@ class EtcToll(object):
             db_engine.dispose()
 
 
-
-
 if __name__ == '__main__':
     # 查询数据库订单
     _, db_session1 = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
-                                      sqlite_database='etc_deduct.sqlite')
+                                       sqlite_database='etc_deduct.sqlite')
     query_item1: ETCRequestInfoOrm = db_session1.query(ETCRequestInfoOrm).filter(
         and_(ETCRequestInfoOrm.lane_num == '002',
              ETCRequestInfoOrm.create_time > (datetime.now() - timedelta(seconds=12000)),
