@@ -6,6 +6,9 @@
 @time:2020/12/07
 """
 from datetime import datetime
+
+from sqlalchemy import desc
+
 from common.config import CommonConf
 from common.db_client import create_db_session
 from model.db_orm import ETCRequestInfoOrm
@@ -29,7 +32,7 @@ class EtcService(object):
         _, db_session = create_db_session(sqlite_dir=CommonConf.SQLITE_DIR,
                                           sqlite_database='etc_deduct.sqlite')
         etc_request_orm: ETCRequestInfoOrm = db_session.query(ETCRequestInfoOrm).filter(
-            ETCRequestInfoOrm.trans_order_no == order_id).first()
+            ETCRequestInfoOrm.trans_order_no == order_id).order_by(desc(ETCRequestInfoOrm.create_time)).first()
         if etc_request_orm:
             deduct_status = etc_request_orm.deduct_status
             result['data'] = deduct_status
