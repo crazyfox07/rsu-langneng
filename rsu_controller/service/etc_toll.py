@@ -178,6 +178,11 @@ class EtcToll(object):
                     body.deduct_status = EtcDeductStatus.FAIL
         except:
             logger.error(traceback.format_exc())
+            result = dict(flag=False,
+                          errorCode='01',
+                          errorMessage='入库失败',
+                          data=None)
+            return result
         # 记入日志
         logger.info(json.dumps(result, ensure_ascii=False))
         # 数据修改好后提交
