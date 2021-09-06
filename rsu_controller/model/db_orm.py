@@ -48,6 +48,7 @@ class ETCRequestInfoOrm(Base):
     flag = Column('flag', SmallInteger, default=0)  # flag=1表示扣费成功或扣费失败，fLag=0表示没有收到obu，没有etc扣费
     deduct_status = Column('deduct_status', String(32), default='deducting')  # deducting正在扣费，fail扣费失败，success扣费成功
     create_time = Column('create_time', DateTime, default=datetime.now)  # now加括号的话数据都是这个固定时间
+    update_time = Column('update_time', DateTime, default=datetime.now)  # now加括号的话数据都是这个固定时间
 
 
 class RSUInfoOrm(Base):

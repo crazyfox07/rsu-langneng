@@ -140,6 +140,7 @@ class EtcToll(object):
                       errorCode='01',
                       errorMessage='etc扣费失败',
                       data=None)
+        diff_time = 0
         if not CommonConf.ETC_DEDUCT_FLAG:
             return result
 
@@ -176,6 +177,9 @@ class EtcToll(object):
                 else:
                     logger.info('...................扣费失败........................')
                     body.deduct_status = EtcDeductStatus.FAIL
+            body.update_time = datetime.now()
+            # 计算update_time与create_time的时间差
+            diff_time = (body.update_time - body.create_time).seconds
         except:
             logger.error(traceback.format_exc())
             result = dict(flag=False,
@@ -192,6 +196,10 @@ class EtcToll(object):
                         params=handle_data_result['data'], )
             logger.info('etc交易成功')
             logger.info(json.dumps(data, ensure_ascii=False))
+            # 如果etc_deduct_notify_url为空，同时diff_time超时，则放弃上传etc数据
+            if (not CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']) and (diff_time >= CommonConf.ETC_CONF_DICT['hongmen_wait_time']):
+                logger.info('etc扣费成功时间与etc扣费请求时间的时间差超时，放弃上传')
+                return result
             # 通知抬杆， 上传etc数据，并将etc数据存入本地
             try:
                 body_dict = dict(park_code=body.park_code,
