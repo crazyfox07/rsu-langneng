@@ -1,10 +1,10 @@
-dev_code: '00000002'  # 设备编号，运行本代码的机器编号，非天线
+dev_code: '00000371108'  # 设备编号，运行本代码的机器编号，非天线
 etc_maker: 'soulin'
 wugan: "false"
 etc:
-  - lane_num: '4028818a76020217017607be4d0a0002'   # 车道号 出口1
-    park_code: '371109'  # 停车场编号
-    ip: '192.168.70.45'  # 天线ip
+  - lane_num: '4028818a7964a9830179733b8df80005'   # 车道号 出口1
+    park_code: '371108'  # 停车场编号
+    ip: '192.168.1.141'  # 天线ip
     port: 60001   # 天线端口
     lane_mode: '04'   # 车道工作模式
     trans_mode: '01'  # 交易模式
@@ -12,23 +12,10 @@ etc:
     pll_channel_id: '00'  # 信道号
     tx_power: 25  # 天线功率，十进制
     obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
-    device_no: "lanneng - 3202001003"# 设备号 32位
+    device_no: "lanneng - 3202371108"# 设备号 32位
     device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
-    sn: 'soulin-311-2006-005'  # 天线sn编号
+    sn: 'soulin-311-2006-371108'  # 天线sn编号
 
-  - lane_num: '4028818a76020217017607be6afc0003'   # 车道号 出口2
-    park_code: '371109'  # 停车场编号
-    ip: '192.168.70.44'  # 天线ip
-    port: 60001   # 天线端口
-    lane_mode: '04'   # 车道工作模式
-    trans_mode: '01'  # 交易模式
-    wait_time: '02'  # 最小重读时间
-    pll_channel_id: '00'  # 信道号
-    tx_power: 20  # 天线功率，十进制
-    obu_div_factor: 'c9bdb6abc9bdb6ab' #  'cdf2bcafcdf2bcaf'  # 山东
-    device_no: "lanneng - 3202001004"# 设备号 32位
-    device_type: "0"# 设备类型（0:天线；1:刷卡器；9:其它）
-    sn: 'soulin-311-2006-016'  # 天线sn编号
 
 # 目前还没有用到mysql数据库
 #mysql:

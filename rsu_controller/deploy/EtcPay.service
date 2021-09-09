@@ -1,0 +1,12 @@
+[Unit]
+Description=Etc Pay Service
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/home/mysecondlinux/miniconda3/bin/python /home/mysecondlinux/rsucontroller/dist/main.py
+ExecStop=/home/mysecondlinux/miniconda3/bin/python /home/mysecondlinux/rsucontroller/dist/deploy/stop_etc_linux.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
