@@ -42,3 +42,4 @@ socket_time_out: 0.5 # socket连接超时设置， 单位秒
 detect_obu_time_latest_diff: 1  # 如果检测到obu的时间距离第三方调用etc接口扣费时间不超detect_obu_time_latest_diff秒,则启用etc扣费，否则禁用
 etc_heartbeat_time_out: 600 # 心跳超时时间，
 recv_msg_max_wait_time: 130  # socket等待接收数据的最长时间
+hongmen_wait_time: 10  # 红门对接的等待时间
