@@ -6,9 +6,11 @@ import string
 import zipfile
 import requests
 import signal
-
+import sys
 from common.config import CommonConf
 from datetime import datetime
+
+from common.log import logger
 
 
 class CommonUtil(object):
@@ -17,8 +19,13 @@ class CommonUtil(object):
         """
         根据pid结束进程
         """
-        for pid in pids:
-            os.kill(pid, signal.SIGTERM)
+        if sys.platform == 'linux':
+            kill_cmd = 'sudo kill -9 {}'.format(' '.join(pids))
+            logger.info(kill_cmd)
+            os.system(kill_cmd)
+        else:
+            for pid in pids:
+                os.kill(pid, signal.SIGTERM)
 
     @staticmethod
     def timestamp_format(timestamp=int(time.time()), format='%Y%m%d%H%M%S'):

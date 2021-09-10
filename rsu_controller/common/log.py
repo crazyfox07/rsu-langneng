@@ -36,7 +36,7 @@ class Logger:
         console_handler.setFormatter(formatter)
         # 添加handler
         self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+        # self.logger.addHandler(console_handler)
         # 设置日志级别
         self.logger.setLevel(logging.INFO)
 
