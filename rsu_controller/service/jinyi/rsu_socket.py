@@ -219,6 +219,14 @@ class RsuSocket(object):
                 c6 = CommandSendSet.combine_c6(obuid=obuid, consume_money=consume_money,
                                                purchase_time=purchase_time,
                                                station_info=station_info, entry_time=entry_time)
+                # 针对红门轮训模式
+                if (not CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']) and (
+                        datetime.datetime.now() - obu_body.create_time).seconds > CommonConf.ETC_CONF_DICT[
+                    'hongmen_wait_time']:
+                    error_msg = '时间超时，终止etc交易'
+                    logger.info(error_msg)
+                    result['error_msg'] = error_msg
+                    return result
                 logger.info('b4后发送c6指令：{}'.format(c6))
                 self.socket_client.send(bytes.fromhex(c6))
             elif msg_str[8:10] == 'b5':

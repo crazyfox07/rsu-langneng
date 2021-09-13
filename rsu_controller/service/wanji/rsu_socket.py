@@ -170,6 +170,14 @@ class RsuSocket(object):
                             obu_body.plate_no, obu_body.plate_color_code, plate_no, obu_plate_color)
                         logger.error(error_msg)
                         # todo 颜色不对，继续扣费
+                    # 针对红门轮训模式
+                    if (not CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']) and (
+                            datetime.datetime.now() - obu_body.create_time).seconds > CommonConf.ETC_CONF_DICT[
+                        'hongmen_wait_time']:
+                        error_msg = '时间超时，终止etc交易'
+                        logger.info(error_msg)
+                        result['error_msg'] = error_msg
+                        return result
                     # 发送c6消费交易指令
                     c6 = CommandSendSet.combine_c6(obuid, obu_div_factor, consume_money, purchase_time, station)
                     logger.info('发送c6指令：{}'.format(c6))
