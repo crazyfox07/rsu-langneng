@@ -20,6 +20,7 @@ class CommonUtil(object):
         根据pid结束进程
         """
         if sys.platform == 'linux':
+            pids = [str(item) for item in pids]
             kill_cmd = 'sudo kill -9 {}'.format(' '.join(pids))
             logger.info(kill_cmd)
             os.system(kill_cmd)
