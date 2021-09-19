@@ -236,6 +236,19 @@ class CommonUtil(object):
         result = ''.join(result)
         return result
 
+    @staticmethod
+    def deduct_stop(accept_request_time):
+        """
+        :param accept_request_time: 接收到扣费请求的时间
+        :return:
+        """
+        # 针对红门轮训模式，如果距离接收到扣费请求的时间过长则停止etc扣费
+        if (not CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']) and (
+                datetime.now() - accept_request_time).seconds >= CommonConf.ETC_CONF_DICT['hongmen_wait_time'] - 2:
+            return True
+        else:
+            return False
+
 
 def crc162(x, invert):
     a = 0xFFFF

@@ -199,7 +199,7 @@ class RsuSocket(object):
                     obu_plate_color = str(
                         int(self.command_recv_set.info_b3['VehicleLicencePlateColor'], 16))  # obu车颜色
                     if (obu_body.plate_no != plate_no):
-                        error_msg = '车牌号不匹配，监控获取的车牌号：%s,obu获取的车牌号：%s'.format(
+                        error_msg = '车牌号不匹配，监控获取的车牌号：{},obu获取的车牌号：{}'.format(
                             obu_body.plate_no, plate_no)
 
                         result['error_msg'] = error_msg
@@ -240,9 +240,7 @@ class RsuSocket(object):
                                                    deduct_amount=deduct_amount, purchase_time=purchase_time,
                                                    station=station)
                     # 针对红门轮训模式
-                    if (not CommonConf.ETC_CONF_DICT['thirdApi']['etc_deduct_notify_url']) and (
-                            datetime.datetime.now() - obu_body.create_time).seconds > CommonConf.ETC_CONF_DICT[
-                        'hongmen_wait_time']:
+                    if CommonUtil.deduct_stop(obu_body.create_time):
                         error_msg = '时间超时，终止etc交易'
                         logger.info(error_msg)
                         result['error_msg'] = error_msg
